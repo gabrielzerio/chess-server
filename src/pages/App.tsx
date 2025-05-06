@@ -1,4 +1,5 @@
- import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { io, Socket } from "socket.io-client";
 
 type PieceColor = "white" | "black";
 type PieceType = "rook" | "knight" | "bishop" | "queen" | "king" | "pawn";
@@ -22,6 +23,24 @@ const initialBoard: (Piece | null)[][] = Array(8)
   .fill(null)
   .map(() => Array(8).fill(null));
 
+async function createGame() {
+  const response = await fetch('http://localhost:3001/games', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  const data = await response.json();
+  return data.gameId;
+}
+
+async function joinGame(gameId: string, playerName: string) {
+  const response = await fetch(`http://localhost:3001/games/${gameId}/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playerName })
+  });
+  return await response.json();
+}
+
 export const ChessGame: React.FC = () => {
   // Estados principais
   const [board, setBoard] = useState<(Piece | null)[][]>(initialBoard);
@@ -32,6 +51,7 @@ export const ChessGame: React.FC = () => {
   const [hint, setHint] = useState("");
   const [highlights, setHighlights] = useState<Position[]>([]);
   const [captureHighlights, setCaptureHighlights] = useState<Position[]>([]);
+  const [socket, setSocket] = useState<Socket | null>(null);
   // Modais
   const [promotionModal, setPromotionModal] = useState<{ open: boolean; position?: Position; color?: PieceColor; squareRect?: DOMRect }>(
     { open: false }
@@ -39,11 +59,16 @@ export const ChessGame: React.FC = () => {
   const [endGameModal, setEndGameModal] = useState<{ open: boolean; winner?: string }>({ open: false });
   const [playerNamesModal, setPlayerNamesModal] = useState(true);
   const [tutorialModal, setTutorialModal] = useState(false);
+  const [joinOrCreateModal, setJoinOrCreateModal] = useState(true);
   // Nomes dos jogadores
   const [player1, setPlayer1] = useState("");
   const [player2, setPlayer2] = useState("");
+  const [joinGameId, setJoinGameId] = useState("");
+  const [joinPlayerName, setJoinPlayerName] = useState("");
+  const [createPlayerName, setCreatePlayerName] = useState("");
   // Tutorial
   const [tutorialPiece, setTutorialPiece] = useState<PieceType | null>(null);
+  const [gameId, setGameId] = useState<string | null>(null);
 
   // refs para posicionamento do modal de promoção
   const boardRefs = useRef<(HTMLDivElement | null)[][]>(
@@ -65,6 +90,22 @@ export const ChessGame: React.FC = () => {
   useEffect(() => {
     // setBoard(...);
   }, []);
+
+  useEffect(() => {
+    if (!gameId) return;
+    const s = io("ws://localhost:3002");
+    s.on("connect", () => {
+      s.emit("join", gameId);
+    });
+    s.on("move", (data) => {
+      // Atualize o tabuleiro com o movimento recebido
+      // Exemplo: applyMove(data.move);
+    });
+    setSocket(s);
+    return () => {
+      s.disconnect();
+    };
+  }, [gameId]);
 
   // Utilitário: remove destaques
   const removeHighlight = () => {
@@ -135,9 +176,88 @@ export const ChessGame: React.FC = () => {
     // setMoveInfo("Clique em uma peça para mover");
   };
 
+  // Novo: fluxo para criar jogo
+  const handleCreateGame = async () => {
+    if (!createPlayerName) return;
+    const id = await createGame();
+    await joinGame(id, createPlayerName);
+    setGameId(id);
+    setPlayer1(createPlayerName);
+    setPlayerNamesModal(false);
+    setJoinOrCreateModal(false);
+    setMoveInfo(`Aguardando outro jogador entrar... (ID: ${id})`);
+    // Aqui você pode aguardar o segundo jogador via websocket depois
+  };
+
+  // Novo: fluxo para entrar em jogo existente
+  const handleJoinGame = async () => {
+    if (!joinGameId || !joinPlayerName) return;
+    const result = await joinGame(joinGameId, joinPlayerName);
+    if (result.success) {
+      setGameId(joinGameId);
+      setPlayer2(joinPlayerName);
+      setPlayerNamesModal(false);
+      setJoinOrCreateModal(false);
+      setMoveInfo(`Entrou no jogo ${joinGameId}`);
+      // Aqui você pode buscar o estado do jogo e conectar websocket
+    } else {
+      setMoveInfo("Erro ao entrar no jogo.");
+    }
+  };
+
+  // Para enviar um movimento:
+  function sendMove(move: any) {
+    socket?.emit("move", { gameId, move });
+  }
+
   // Render
   return (
     <div className="min-h-screen bg-gray-100 font-sans">
+      {/* Modal inicial: criar ou entrar em jogo */}
+      {joinOrCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-xl border-4 border-neutral-800 shadow-xl flex flex-col gap-6 items-center min-w-[350px]">
+            <h2 className="font-serif text-xl font-bold mb-2">Bem-vindo ao Xadrez Online</h2>
+            <div className="w-full">
+              <h3 className="font-bold mb-2">Criar novo jogo</h3>
+              <input
+                className="border-2 border-neutral-800 rounded px-4 py-2 mb-2 w-full"
+                value={createPlayerName}
+                onChange={e => setCreatePlayerName(e.target.value)}
+                placeholder="Seu nome"
+              />
+              <button
+                className="bg-green-700 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-900 w-full"
+                onClick={handleCreateGame}
+              >
+                Criar Jogo
+              </button>
+            </div>
+            <div className="w-full border-t border-gray-300 pt-4">
+              <h3 className="font-bold mb-2">Entrar em jogo existente</h3>
+              <input
+                className="border-2 border-neutral-800 rounded px-4 py-2 mb-2 w-full"
+                value={joinGameId}
+                onChange={e => setJoinGameId(e.target.value)}
+                placeholder="ID do jogo"
+              />
+              <input
+                className="border-2 border-neutral-800 rounded px-4 py-2 mb-2 w-full"
+                value={joinPlayerName}
+                onChange={e => setJoinPlayerName(e.target.value)}
+                placeholder="Seu nome"
+              />
+              <button
+                className="bg-blue-700 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-900 w-full"
+                onClick={handleJoinGame}
+              >
+                Entrar no Jogo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-12 grid-cols-1 md:grid-cols-3 p-8" id="main-grid">
         {/* Dead Pieces */}
         <div className="dead-pieces flex flex-col justify-between p-5 h-[500px] w-[200px] rounded-lg text-4xl bg-neutral-600 self-center md:justify-self-end">
