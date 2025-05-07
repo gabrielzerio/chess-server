@@ -52,6 +52,7 @@ export const ChessGame: React.FC = () => {
   const [highlights, setHighlights] = useState<Position[]>([]);
   const [captureHighlights, setCaptureHighlights] = useState<Position[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [playerColor, setPlayerColor] = useState<PieceColor | null>(null);
   // Modais
   const [promotionModal, setPromotionModal] = useState<{ open: boolean; position?: Position; color?: PieceColor; squareRect?: DOMRect }>(
     { open: false }
@@ -93,18 +94,40 @@ export const ChessGame: React.FC = () => {
 
   useEffect(() => {
     if (!gameId) return;
-    const s = io("ws://localhost:3002");
+    // Corrige: envia também o nome do jogador ao entrar na sala
+    const playerName = player1 || createPlayerName || joinPlayerName;
+    const s = io("ws://localhost:3001");
     s.on("connect", () => {
-      s.emit("join", gameId);
+      s.emit("join", { gameId, playerName });
     });
-    s.on("move", (data) => {
-      // Atualize o tabuleiro com o movimento recebido
-      // Exemplo: applyMove(data.move);
+    s.on("joined", ({ board, color, turn }) => {
+      setBoard(board);
+      setPlayerColor(color);
+      setTurn(turn);
+      setMoveInfo(color ? `Você está jogando de ${color === "white" ? "brancas" : "pretas"}` : "");
+    });
+    s.on("boardUpdate", ({ board, turn }) => {
+      setBoard(board);
+      setTurn(turn);
+    });
+    s.on("moveError", ({ message }) => {
+      alert(message);
     });
     setSocket(s);
     return () => {
       s.disconnect();
     };
+  }, [gameId, player1, createPlayerName, joinPlayerName]);
+
+  // Buscar o board inicial do back-end quando gameId mudar
+  useEffect(() => {
+    if (!gameId) return;
+    fetch(`http://localhost:3001/games/${gameId}/board`)
+      .then(res => res.json())
+      .then(data => {
+        setBoard(data.board);
+        setTurn(data.turn);
+      });
   }, [gameId]);
 
   // Utilitário: remove destaques
@@ -122,11 +145,28 @@ export const ChessGame: React.FC = () => {
   // Clique no tabuleiro
   const handleSquareClick = (row: number, col: number) => {
     setMoveInfo(`Clicou em ${String.fromCharCode(65 + col)}${8 - row}`);
-    // Exemplo: destaca movimentos válidos e capturas
-    // setHighlights([...]);
-    // setCaptureHighlights([...]);
-    // Se promoção, chama showPromotionDialog(row, col, piece.color)
+    if (selected && (selected.row !== row || selected.col !== col)) {
+      // Só permite mover se for a vez do jogador
+      if (playerColor && turn === playerColor) {
+        sendMove(selected, { row, col });
+      } else {
+        setMoveInfo("Aguarde sua vez.");
+      }
+      setSelected(null);
+    } else {
+      setSelected({ row, col });
+    }
   };
+
+  // Função para enviar movimento ao servidor (corrigida)
+  function sendMove(from: Position, to: Position, promotionType?: PieceType) {
+    if (!playerColor) {
+      setMoveInfo("Você não está em uma partida ativa.");
+      return;
+    }
+    const playerName = player1 || createPlayerName || joinPlayerName;
+    socket?.emit('move', { gameId, from, to, promotionType, playerName });
+  }
 
   // Modal de promoção
   const showPromotionDialog = (color: PieceColor, position: Position) => {
@@ -205,11 +245,6 @@ export const ChessGame: React.FC = () => {
     }
   };
 
-  // Para enviar um movimento:
-  function sendMove(move: any) {
-    socket?.emit("move", { gameId, move });
-  }
-
   // Render
   return (
     <div className="min-h-screen bg-gray-100 font-sans">
@@ -276,7 +311,11 @@ export const ChessGame: React.FC = () => {
         {/* Chess Board & Info */}
         <div className="chess-container flex flex-col gap-5 w-fit">
           <div id="turn-info" className="bg-yellow-100 p-5 text-lg text-center rounded-lg">
-            Turno: {turn === "white" ? player1 || "Jogador Branco" : player2 || "Jogador Preto"}
+            {playerColor
+              ? (turn === playerColor
+                  ? "Sua vez"
+                  : "Aguardando adversário")
+              : `Turno: ${turn === "white" ? player1 || "Jogador Branco" : player2 || "Jogador Preto"}`}
           </div>
           <div>
             <div id="board-wrapper" className="flex items-center">
