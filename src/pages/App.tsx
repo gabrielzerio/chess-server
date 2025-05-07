@@ -12,11 +12,11 @@ interface Piece {
 
 const pieceSymbols: Record<PieceType, Record<PieceColor, string>> = {
   rook: { white: "♖", black: "♜" },
-  knight: { white: "♘", black: "♞" },
-  bishop: { white: "♗", black: "♝" },
-  queen: { white: "♕", black: "♛" },
-  king: { white: "♔", black: "♚" },
-  pawn: { white: "♙", black: "♟" },
+    knight: { white: "♘", black: "♞" },
+    bishop: { white: "♗", black: "♝" },
+    queen: { white: "♕", black: "♛" },
+    king: { white: "♔", black: "♚" },
+    pawn: { white: "♙", black: "♟" },
 };
 
 const initialBoard: (Piece | null)[][] = Array(8)

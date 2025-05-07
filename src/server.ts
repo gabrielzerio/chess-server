@@ -127,6 +127,7 @@ io.on('connection', (socket) => {
     let moved = false;
     // Promoção de peão
     if (piece.type === 'pawn' && (to.row === 0 || to.row === 7) && promotionType) {
+    
       // Verifica se o movimento é válido
       if (typeof piece.move === 'function' && await piece.move(from, to, game.board, context)) {
         const newPiece = PieceFactory.createPiece(promotionType, piece.color, to);
