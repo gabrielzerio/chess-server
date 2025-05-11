@@ -147,6 +147,9 @@ export abstract class Piece {
     return king ? king.isInCheck(board) : false;
   }
 
+  // isCheckMate(king: King, pieces: Piece[], board: Board):boolean {
+  //   return false;
+  // }
   /**
    * Encontra o rei do mesmo time no tabuleiro.
    */

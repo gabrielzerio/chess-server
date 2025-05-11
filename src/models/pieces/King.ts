@@ -79,6 +79,7 @@ export class King extends Piece {
   }
 
   static isCheckmate(king: King, pieces: Piece[], board: Board): boolean {
+
     if (!king.isInCheck(board)) {
       return false;
     }
@@ -87,7 +88,7 @@ export class King extends Piece {
       .filter(p => p.color === king.color)
       .some(piece => {
         const { row, col } = piece.position;
-
+          //itera o pieces, e para na primeira peça que pode salvar o rei
         for (let r = 0; r < 8; r++) {
           for (let c = 0; c < 8; c++) {
             if (piece.isValidMove({ row, col }, { row: r, col: c }, board)) {

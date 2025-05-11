@@ -7,7 +7,7 @@ import { PieceFactory } from './models/PieceFactory';
 import { MoveContext, Piece } from './models/pieces/Piece';
 import { PieceColor, Board } from './models/types';
 import { Position, EnPassantTarget } from './models/types'; 
-import { Pawn } from './models/pieces';
+import { Pawn, King } from './models/pieces';
 
 interface Player{
  name: string; 
@@ -56,7 +56,6 @@ app.post('/games', (req: Request, res: Response) => {
   };
   console.log(`Game created: ${gameId}`);
   res.json({ gameId });
-  console.log('Games:', games);
 });
 
 
@@ -131,7 +130,7 @@ app.post('/games/:gameId/moves', async (req: Request, res: Response):Promise<any
     possibleMoves = piece.showPossibleMoves(game.board, context);
   }
   const normalMoves: Position[] = [];
-const captureMoves: Position[] = [];
+  const captureMoves: Position[] = [];
 
 for (const move of possibleMoves) {
   const targetPiece = game.board[move.row][move.col];
@@ -199,6 +198,9 @@ io.on('connection', (socket) => {
       socket.emit('moveError', { message: 'You can only move your own pieces.' });
       return;
     }
+
+
+    // if(King.isCheckmate(piece as King, game.board)) {
     // Contexto para promoção
     const context:MoveContext = { enPassantTarget };	
     // if (promotionType) context.promotionType = promotionType;
@@ -228,7 +230,7 @@ io.on('connection', (socket) => {
         
       }
     }
-    console.log(enPassantTarget);
+   
     if (moved) {
       // Alterna o turno
       game.turn = game.turn === 'white' ? 'black' : 'white';
@@ -240,10 +242,24 @@ io.on('connection', (socket) => {
         )
       );
       io.to(gameId).emit('boardUpdate', { board: serializedBoard, turn: game.turn });
+      
+      function getAllPieces(board: Board): Piece[] {
+        return board.flat().filter((p): p is Piece => p !== null);
+      }
+
+      const pieces = getAllPieces(game.board);
+      const king = pieces.find(p => p.type === 'king' && p.color === game.turn) as King;
+        if (king && King.isCheckmate(king, pieces, game.board)) {
+          // Xeque-mate!
+          game.status = 'checkmate';
+          io.to(gameId).emit('gameOver', { winner: player.color });
+        }
     } else {
       socket.emit('moveError', { message: 'Invalid move.' });
     }
   });
+
+  
 
   socket.on('disconnect', () => {
     console.log('Cliente desconectado:', socket.id);

@@ -1,9 +1,10 @@
 import { PieceFactory } from '../models/PieceFactory';
 import type { Board } from '../models/types';
+import type { Piece } from '../models/pieces/Piece';
 
 export function createInitialBoard(): Board {
   const board: Board = Array(8).fill(null).map(() => Array(8).fill(null));
-  const pieces = [
+  const pieces:Piece[] = [
     // Pretas
     PieceFactory.createPiece('rook', 'black', { row: 0, col: 0 }),
     PieceFactory.createPiece('knight', 'black', { row: 0, col: 1 }),
@@ -26,7 +27,8 @@ export function createInitialBoard(): Board {
     PieceFactory.createPiece('rook', 'white', { row: 7, col: 7 }),
   ];
   pieces.forEach(piece => {
-    board[piece.position.row][piece.position.col] = piece;
+    const { row, col } = piece.position;
+    board[row][col] = piece;
   });
   return board;
 }
