@@ -79,7 +79,7 @@ function deserializeBoard(serializedBoard: Board): Board {
 }
 
 // Novo endpoint: retorna movimentos possíveis para uma peça
-app.post('/games/:gameId/moves', async (req: Request, res: Response) => {
+app.post('/games/:gameId/moves', async (req: Request, res: Response):Promise<any> => {
   const { gameId } = req.params;
   const { from, playerName } = req.body; // { row, col }, playerName opcional
   const game = games[gameId];
@@ -182,7 +182,7 @@ io.on('connection', (socket) => {
     }
     // Contexto para promoção
     const context:MoveContext = { enPassantTarget };	
-    if (promotionType) context.promotionType = promotionType;
+    // if (promotionType) context.promotionType = promotionType;
 
     let moved = false;
     // só entra nesse if se for um peão e o movimento for para a última linha (0 ou 7)
