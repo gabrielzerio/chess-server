@@ -1,9 +1,14 @@
-FROM node
-RUN mkdir app
-WORKDIR ./app
-COPY package.json .
+FROM node:18
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
 RUN npm install
+
 COPY . .
+
 EXPOSE 3001
+
 RUN npm run build
+
 CMD ["npm", "start"]

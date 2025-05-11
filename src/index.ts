@@ -9,11 +9,24 @@ import { PieceColor, Board } from './models/types';
 import { Position, EnPassantTarget } from './models/types'; 
 import { Pawn } from './models/pieces';
 
+interface Player{
+ name: string; 
+ color: PieceColor; 
+ socketId: string | null;
+}
+interface Game {
+  players: Player[];
+  board: Board;
+  turn: PieceColor;
+  status: string;
+}
 
-type Game = { players: { name: string; color: PieceColor; socketId: string | null }[]; board:Board ; turn: PieceColor; status: string };
 type GamesMap = { //lista de jogos do tipo Game
   [gameId: string]: Game;
 };
+
+let games:GamesMap = {};
+
 let enPassantTarget: EnPassantTarget | null = null;
 
 // Initialize the express engine
@@ -27,7 +40,11 @@ const io = new Server(server, {
   cors: { origin: '*' }
 });
 
-let games: GamesMap = {};
+app.get('/games', (req: Request, res: Response) => {
+  const gameIds = Object.keys(games);
+  res.json( { gameIds });
+} );
+
 
 app.post('/games', (req: Request, res: Response) => {
   const gameId = Math.random().toString(36).substr(2, 9);
@@ -39,7 +56,9 @@ app.post('/games', (req: Request, res: Response) => {
   };
   console.log(`Game created: ${gameId}`);
   res.json({ gameId });
+  console.log('Games:', games);
 });
+
 
 app.post('/games/:gameId/join',(req: Request<{ gameId: string }, any, { playerName: string }>, res: Response):any => {
   const { gameId } = req.params;
