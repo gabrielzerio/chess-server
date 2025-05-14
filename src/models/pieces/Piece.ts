@@ -6,7 +6,6 @@ import { King } from './King';
  */
 export interface MoveContext {
   enPassantTarget?: Position | null;
-  showPromotionDialog?: (color: PieceColor, position: Position) => Promise< PieceType >;
   // outros campos especiais podem ser adicionados aqui
 }
 
@@ -93,7 +92,6 @@ export abstract class Piece {
       board[from.row][from.col] = this;
       board[to.row][to.col] = originalPiece;
       this.position = originalPosition;
-      console.log('nao vai n');
       return false;
     }
 
@@ -147,6 +145,9 @@ export abstract class Piece {
     return king ? king.isInCheck(board) : false;
   }
 
+  // isCheckMate(king: King, pieces: Piece[], board: Board):boolean {
+  //   return false;
+  // }
   /**
    * Encontra o rei do mesmo time no tabuleiro.
    */

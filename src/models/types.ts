@@ -11,6 +11,12 @@ export interface EnPassantTarget {
   col: number;
 }
 
+export interface Player{
+ name: string; 
+ color: PieceColor; 
+ socketId: string | null;
+}
+
 // Import da classe base Piece
 import { Piece } from './pieces/Piece';
 export type Board = (Piece | null)[][];

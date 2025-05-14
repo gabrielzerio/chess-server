@@ -1,6 +1,5 @@
 import { Piece, MoveContext } from './Piece';
 import { Position, Board, PieceType } from '../types';
-import { promotePawn } from '../../utils/promotionUtils';
 
 export class Pawn extends Piece {
   constructor(color: 'white' | 'black', position: Position) {
@@ -74,11 +73,6 @@ export class Pawn extends Piece {
     if (isEnPassantMove) {
       const capturedPawnRow = this.color === "white" ? to.row + 1 : to.row - 1;
       board[capturedPawnRow][to.col] = null;
-    }
-
-    // Só chama promotePawn se o callback existir
-    if (typeof context.showPromotionDialog === 'function') {
-      await promotePawn(this, to, board, context.showPromotionDialog);
     }
     return true;
   }
