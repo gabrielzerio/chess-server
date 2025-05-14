@@ -6,7 +6,6 @@ import { King } from './King';
  */
 export interface MoveContext {
   enPassantTarget?: Position | null;
-  showPromotionDialog?: (color: PieceColor, position: Position) => Promise< PieceType >;
   // outros campos especiais podem ser adicionados aqui
 }
 
@@ -93,7 +92,6 @@ export abstract class Piece {
       board[from.row][from.col] = this;
       board[to.row][to.col] = originalPiece;
       this.position = originalPosition;
-      console.log('nao vai n');
       return false;
     }
 
