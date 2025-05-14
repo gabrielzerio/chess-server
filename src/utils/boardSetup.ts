@@ -1,6 +1,6 @@
 import { PieceFactory } from '../models/PieceFactory';
 import type { Board } from '../models/types';
-import type { Piece } from '../models/pieces/Piece';
+import type { Piece } from '../class/piece';
 
 export function createInitialBoard(): Board {
   const board: Board = Array(8).fill(null).map(() => Array(8).fill(null));

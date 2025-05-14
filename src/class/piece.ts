@@ -1,5 +1,5 @@
-import { Position, Board, PieceType, PieceColor } from '../types';
-import { King } from './King';
+import { Position, Board, PieceType, PieceColor } from '../models/types';
+import { King } from '../models/pieces/King';
 
 /**
  * Contexto especial para movimentos, como en passant.
@@ -13,6 +13,8 @@ export interface MoveContext {
  * Classe abstrata que representa uma peça de xadrez.
  */
 export abstract class Piece {
+    
+
   constructor(
     public readonly type: PieceType,
     public readonly color: PieceColor,

@@ -1,4 +1,4 @@
-export * from './Piece';
+export * from '../../class/piece';
 export * from './Pawn';
 export * from './Rook';
 export * from './Knight';

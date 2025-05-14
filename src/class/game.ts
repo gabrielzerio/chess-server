@@ -1,9 +1,9 @@
-import { Board, PieceColor, Position, EnPassantTarget, Player, PieceType } from './models/types';
-import { MoveContext, Piece } from './models/pieces/Piece';
-import { PieceFactory } from './models/PieceFactory';
+import { Board, PieceColor, Position, EnPassantTarget, Player, PieceType } from '../models/types';
+import { MoveContext, Piece } from './piece';
+import { PieceFactory } from '../models/PieceFactory';
 import { Socket } from 'socket.io';
-import { Pawn } from './models/pieces/Pawn';
-import { King } from './models/pieces/King';
+import { Pawn } from '../models/pieces/Pawn';
+import { King } from '../models/pieces/King';
 
 export class Game {
   players: Player[];
@@ -161,4 +161,11 @@ export class Game {
         return this.board.flat().filter((p): p is Piece => p !== null);
       }
 
+    removeSocketId(socketId:string){
+      
+        this.players.forEach((p:Player)=>{
+          if(p.socketId === socketId) p.socketId = null;
+          // console.log("removeu")
+        })
+  }
   }

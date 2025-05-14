@@ -18,5 +18,5 @@ export interface Player{
 }
 
 // Import da classe base Piece
-import { Piece } from './pieces/Piece';
+import { Piece } from '../class/piece';
 export type Board = (Piece | null)[][];
