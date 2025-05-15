@@ -23,31 +23,31 @@ export class King extends Piece {
     return false;
   }
 
-isValidMove(from: Position, to: Position, board: Board, context: MoveContext = {}): boolean {
-  if (!this.isValidPattern(from, to, board, context)) {
-    return false;
-  }
+// isValidMove(from: Position, to: Position, board: Board, context: MoveContext = {}): boolean {
+//   if (!this.isValidPattern(from, to, board, context)) {
+//     return false;
+//   }
 
-  // Não pode capturar peça aliada!
-  const targetPiece = board[to.row][to.col];
-  if (targetPiece && targetPiece.color === this.color) {
-    return false;
-  }
+//   // Não pode capturar peça aliada!
+//   const targetPiece = board[to.row][to.col];
+//   if (targetPiece && targetPiece.color === this.color) {
+//     return false;
+//   }
 
-  // Simula a captura da peça inimiga (se houver)
-  const originalFrom = board[from.row][from.col];
-  board[from.row][from.col] = null;
-  board[to.row][to.col] = this;
+//   // Simula a captura da peça inimiga (se houver)
+//   const originalFrom = board[from.row][from.col];
+//   board[from.row][from.col] = null;
+//   board[to.row][to.col] = this;
 
-  // Verifica se a casa de destino está sob ataque
-  const isSafe = !this.isSquareUnderAttack(to.row, to.col, this.color, board);
+//   // Verifica se a casa de destino está sob ataque
+//   const isSafe = !this.isSquareUnderAttack(to.row, to.col, this.color, board);
 
-  // Desfaz a simulação
-  board[from.row][from.col] = originalFrom;
-  board[to.row][to.col] = targetPiece;
+//   // Desfaz a simulação
+//   board[from.row][from.col] = originalFrom;
+//   board[to.row][to.col] = targetPiece;
 
-  return isSafe;
-}
+//   return isSafe;
+// }
 
   private isCastlingValid(from: Position, to: Position, board: Board): boolean {
     if (this.isInCheck(board)) return false;
