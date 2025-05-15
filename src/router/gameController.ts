@@ -5,7 +5,7 @@ import { Game } from '../class/game';
 import { Player } from '../models/types';
 
 export const createGame = (req: Request, res: Response) => {
-    const gameId = Math.random().toString(36).substr(2, 9);
+    const gameId = Math.random().toString(36).substr(2, 4);
   games[gameId] = new Game(createInitialBoard());
   console.log(`Game created: ${gameId}`);
   res.json({ gameId });
