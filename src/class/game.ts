@@ -130,7 +130,7 @@ export class Game {
     if (!moved) {
         moved = await this.normalMovement(piece, from, to);
     }
-    if(moved){
+    if(moved){ 
         this.setEnpassantPosition(piece,from,to);
     }
     return moved;
@@ -140,9 +140,11 @@ export class Game {
         return this.turn = this.turn === 'white' ? 'black' : 'white';
      }   
     
-    setEnpassantPosition(piece:Piece, from:Position, to:Position){
-        if (piece instanceof Pawn) {
+    setEnpassantPosition(piece:Piece, from:Position, to:Position){ //getEnPassant verifica se pulou duas casas, se sim, retorna a posição de enpassant
+        if (piece instanceof Pawn) { //se for instancia de peão mas não andar duas casa o getEnPassantTarget retorna null;
             this.enPassantTarget = piece.getEnPassantTarget(from, to);
+        }else{ // mas se não for instancia de peão o target deve ser resetado
+            this.enPassantTarget = null;
         }
     }
 
