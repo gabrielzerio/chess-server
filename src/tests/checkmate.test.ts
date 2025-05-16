@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { PieceFactory } from '../models/PieceFactory';
 import { Board } from '../models/types';
 import { King } from '../models/pieces/King';
-import { Piece } from '../models/pieces/Piece';
+import { Piece } from '../class/piece';
 
 describe('Checkmate situation', () => {
   let board: Board;

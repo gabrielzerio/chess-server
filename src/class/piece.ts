@@ -1,5 +1,5 @@
-import { Position, Board, PieceType, PieceColor } from '../types';
-import { King } from './King';
+import { Position, Board, PieceType, PieceColor } from '../models/types';
+import { King } from '../models/pieces/King';
 
 /**
  * Contexto especial para movimentos, como en passant.
@@ -13,6 +13,8 @@ export interface MoveContext {
  * Classe abstrata que representa uma peça de xadrez.
  */
 export abstract class Piece {
+    
+
   constructor(
     public readonly type: PieceType,
     public readonly color: PieceColor,
@@ -20,16 +22,12 @@ export abstract class Piece {
     public hasMoved: boolean = false
   ) {}
 
-  /**
-   * Verifica se o movimento é válido para esta peça, considerando o contexto especial.
-   */
+  
   isValidMove(from: Position, to: Position, board: Board, context: MoveContext = {}): boolean {
     return this.isValidPattern(from, to, board, context) && this.isMoveSafe(from, to, board);
   }
 
-  /**
-   * Verifica se o padrão de movimento é válido para esta peça.
-   */
+  //cada peça deve verificar se o padrão de movimentação é valido
   protected abstract isValidPattern(from: Position, to: Position, board: Board, context?: MoveContext): boolean;
 
   /**
@@ -45,6 +43,7 @@ export abstract class Piece {
   protected isMoveSafe(from: Position, to: Position, board: Board): boolean {
     const targetPiece = board[to.row][to.col];
     if (targetPiece && targetPiece.color === this.color) {
+       
       return false;
     }
 

@@ -1,9 +1,9 @@
-import { Board, PieceColor, Position, EnPassantTarget, Player, PieceType } from './models/types';
-import { MoveContext, Piece } from './models/pieces/Piece';
-import { PieceFactory } from './models/PieceFactory';
+import { Board, PieceColor, Position, EnPassantTarget, Player, PieceType } from '../models/types';
+import { MoveContext, Piece } from './piece';
+import { PieceFactory } from '../models/PieceFactory';
 import { Socket } from 'socket.io';
-import { Pawn } from './models/pieces/Pawn';
-import { King } from './models/pieces/King';
+import { Pawn } from '../models/pieces/Pawn';
+import { King } from '../models/pieces/King';
 
 export class Game {
   players: Player[];
@@ -130,7 +130,7 @@ export class Game {
     if (!moved) {
         moved = await this.normalMovement(piece, from, to);
     }
-    if(moved){
+    if(moved){ 
         this.setEnpassantPosition(piece,from,to);
     }
     return moved;
@@ -140,9 +140,11 @@ export class Game {
         return this.turn = this.turn === 'white' ? 'black' : 'white';
      }   
     
-    setEnpassantPosition(piece:Piece, from:Position, to:Position){
-        if (piece instanceof Pawn) {
+    setEnpassantPosition(piece:Piece, from:Position, to:Position){ //getEnPassant verifica se pulou duas casas, se sim, retorna a posição de enpassant
+        if (piece instanceof Pawn) { //se for instancia de peão mas não andar duas casa o getEnPassantTarget retorna null;
             this.enPassantTarget = piece.getEnPassantTarget(from, to);
+        }else{ // mas se não for instancia de peão o target deve ser resetado
+            this.enPassantTarget = null;
         }
     }
 
@@ -161,4 +163,11 @@ export class Game {
         return this.board.flat().filter((p): p is Piece => p !== null);
       }
 
+    removeSocketId(socketId:string){
+      
+        this.players.forEach((p:Player)=>{
+          if(p.socketId === socketId) p.socketId = null;
+          // console.log("removeu")
+        })
+  }
   }

@@ -2,9 +2,9 @@ import express, {Request, Response} from 'express';
 import cors from 'cors';
 import http from 'http';
 import { Server } from 'socket.io';
-import { Piece } from './models/pieces/Piece';
+import { Piece } from './class/piece';
 import { games } from './gameStore';
-import gameRoutes from './routes/gameRoutes';
+import gameRoutes from './router/gameRoutes';
 
 // import { registerSocketHandlers } from './socketHandlers';
 // registerSocketHandlers(io);
@@ -31,7 +31,7 @@ io.on('connection', (socket) => {
       return;
     }
    
-    // Atualiza socketId do jogador
+    // Atualiza socketId do jogador, se ele já tiver entrado nessa partida anteriormente, mas não saiu do jogo (refresh por exemplo)
     const player = games[gameId].checkPlayerName(playerName);
     if (player) player.socketId = socket.id;
     socket.join(gameId);
@@ -40,6 +40,7 @@ io.on('connection', (socket) => {
       board: games[gameId].deserializeBoard(), color: player ? player.color : null, turn: games[gameId].turn
     });
     io.to(gameId).emit('playersUpdate', { players: games[gameId].players });
+    socket.data.gameId = gameId;
   });
 
   socket.on('move', async ({ gameId, from, to, promotionType, playerName }) => {
@@ -91,13 +92,19 @@ io.on('connection', (socket) => {
   
 
   socket.on('disconnect', () => {
-    console.log('Cliente desconectado:', socket.id);
+    
     // Remove socketId dos jogadores desconectados
-    Object.values(games).forEach((game: any) => {
-      game.players.forEach((p: any) => {
-        if (p.socketId === socket.id) p.socketId = null;
-      });
-    });
+    // Object.values(games).forEach((game: any) => {
+    //   game.players.forEach((p: any) => {
+    //     if (p.socketId === socket.id) p.socketId = null;
+    //   });
+    // });
+    try{
+      games[socket.data.gameId].removeSocketId(socket.id);
+      console.log("jogador desconectado", socket.id)
+    }catch(error){
+      console.log("o game pode já ter sido excluido anteriormente!");
+    }
   });
 });
 

@@ -1,4 +1,4 @@
-import { Piece, MoveContext } from './Piece';
+import { Piece, MoveContext } from '../../class/piece';
 import { Position, Board } from '../types';
 
 export class Bishop extends Piece {

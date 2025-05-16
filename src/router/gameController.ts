@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
 import { games } from '../gameStore';
 import { createInitialBoard } from '../utils/boardSetup';
-import { Game } from '../game';
+import { Game } from '../class/game';
 import { Player } from '../models/types';
 
 export const createGame = (req: Request, res: Response) => {
-    const gameId = Math.random().toString(36).substr(2, 9);
+    const gameId = Math.random().toString(36).substr(2, 4);
   games[gameId] = new Game(createInitialBoard());
   console.log(`Game created: ${gameId}`);
   res.json({ gameId });
@@ -18,7 +18,9 @@ export const joinGame = (req: Request<{ gameId: string }, any, { playerName: str
   if (games[gameId].players.length >= 2) return res.status(400).json({ error: 'Game full' });
   // Atribui cor automaticamente
   const color = games[gameId].players.length === 0 ? 'white' : 'black';
-  games[gameId].players.push({ name: playerName, color, socketId: null }); //utilizar metodo do game.ts
+  // games[gameId].players.push({ name: playerName, color, socketId: null }); //utilizar metodo do game.ts
+  const player:Player = {name:playerName, color:color, socketId:null};
+  games[gameId].addPlayer(player) 
   if (games[gameId].players.length === 2) games[gameId].status = 'playing';
   return res.json({ success: true, color });
 };
@@ -30,7 +32,6 @@ export const validGame = (req: Request, res: Response):any => {
    if (!games[gameId].players.find((p:Player) => p.name === playerName)) {
      return res.status(403).json({ error: 'Player not in game' });
    }
-   console.log(games[gameId].turn)
    res.json( {valid:true} );
 };
 
