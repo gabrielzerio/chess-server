@@ -6,11 +6,11 @@ import { Pawn } from '../models/pieces/Pawn';
 import { King } from '../models/pieces/King';
 
 export class Game {
-  players: Player[];
-  board: Board;
-  turn: PieceColor;
-  status: string;
-  enPassantTarget: EnPassantTarget | null;
+  private players: Player[];
+  private board: Board;
+  private turn: PieceColor;
+  private status: string;
+  private enPassantTarget: EnPassantTarget | null;
 
   constructor(board: Board) {
     this.players = [];
@@ -19,9 +19,23 @@ export class Game {
     this.status = 'waiting';
     this.enPassantTarget = null;
   }
-
+  getBoard():Board{
+    return this.board;     
+  }
+  getTurn():PieceColor{
+    return this.turn;
+  }
+  getPlayers():Player[]{
+    return this.players;
+  }
   existsGame(){
     return this;
+  }
+  getStatus(){
+    return this.status;
+  }
+  setStatus(status:string){
+    this.status = status;
   }
 
   addPlayer(player: Player): boolean {
@@ -30,6 +44,8 @@ export class Game {
     if (this.players.length === 2) this.status = 'playing';
     return true;
   }
+
+
 
   deserializeBoard(): Board {
     return this.board.map((row, rowIdx) =>
@@ -163,11 +179,22 @@ export class Game {
         return this.board.flat().filter((p): p is Piece => p !== null);
       }
 
-    removeSocketId(socketId:string){
-      
+    async removeSocketId(socketId:string){
+        console.log(this.players);
         this.players.forEach((p:Player)=>{
+          
           if(p.socketId === socketId) p.socketId = null;
-          // console.log("removeu")
         })
   }
+  // console.log(this.players);
+  //       // this.players[].socketId?.indexOf(socketId);:
+  //       this.players.forEach((p:Player)=>{
+          
+  //         if(p.socketId === socketId){
+  //           const index = p.socketId.indexOf(socketId);
+  //           this.players.splice(index,1)
+  //           console.log(index);
+  //         }  
+  //         console.log(this.players);
+  //       })
   }
