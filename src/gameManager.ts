@@ -173,7 +173,7 @@ export class GameManager {
         const piece = game.getSelectedPiece(from);
         if(!piece) return;
         
-        const moveResult = await game.canMove(piece, to, from, promotionType);
+        const moveResult = await game.applyMove(socket.id, to, from, promotionType);
 
         if (moveResult.success) {
             this.io.to(gameId).emit('boardUpdate', { board: moveResult.board, turn: moveResult.turn, status: moveResult.status });
