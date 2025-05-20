@@ -1,6 +1,6 @@
 import { Server, Socket } from "socket.io"
 import { PieceType, Position } from "../models/types";
-import { games } from "../gameStore";
+import { games } from "../gameManager";
 import { Piece } from "../class/piece";
 
 export function handleMove(io:Server, socket:Socket){

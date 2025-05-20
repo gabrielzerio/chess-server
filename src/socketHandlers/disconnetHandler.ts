@@ -1,5 +1,5 @@
 import { Server, Socket } from "socket.io";
-import { games } from "../gameStore";
+import { games } from "../gameManager";
 
 export function handleDisconnect(io:Server, socket:Socket){
     async function disconnect(){ // é necessario aguardar a remoção do socket do jogador para evitar erros
@@ -12,7 +12,6 @@ export function handleDisconnect(io:Server, socket:Socket){
     // });
     try{
       await games[socket.data.gameId].removeSocketId(socket.id); 
-  
       console.log("jogador desconectado", socket.id)
     }catch(error){
       console.log("o game pode já ter sido excluido anteriormente!");

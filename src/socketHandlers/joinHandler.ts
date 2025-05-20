@@ -1,6 +1,6 @@
 import { Server } from "socket.io";
 import { Socket } from "socket.io";
-import { games } from "../gameStore";
+import { games } from "../gameManager";
 
 export function handleJoin (io:Server, socket:Socket) {
     // socket.on('join', ({ gameId, playerName }) => {
@@ -32,6 +32,7 @@ export function handleJoin (io:Server, socket:Socket) {
         if (player) player.socketId = socket.id;
         
         socket.join(gameId);
+        // console.log(socket)
         // Envia board atual e cor do jogador
         socket.emit('joined', {
             board: games[gameId].serializeBoard(), color: player ? player.color : null, turn: games[gameId].getTurn()
