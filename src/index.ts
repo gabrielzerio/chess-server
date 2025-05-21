@@ -4,7 +4,7 @@ import http from 'http';
 import {Server} from 'socket.io';
 import gameRoutes from './router/gameRoutes';
 import { GameManager } from './gameManager';
-
+import * as gameController from './router/gameController'
 
 const app: express.Application = express();
 
@@ -20,6 +20,7 @@ const io = new Server(server, {
 });
 
 const gameManager = new GameManager(io);
+gameController.setGameManager(gameManager);
 
  io.on('connection', (socket) => {
     gameManager.handleSocketConnection(socket); // Delega o socket para o GameManager

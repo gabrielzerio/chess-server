@@ -9,7 +9,9 @@ import { createInitialBoard } from './utils/boardSetup'; // Sua função de cria
 interface ActiveGames {
     [gameId: string]: Game;
 }
-
+type PossibleMovesResponse = {
+    playerName:string; //futuramente pode ser usado o auth
+}
 export class GameManager {
     private io: SocketIOServer;
     private games: ActiveGames = {}; // Armazena instâncias de Game por gameId
@@ -69,7 +71,7 @@ export class GameManager {
 
         // O 'this' deve se referir à instância do GameManager
         socket.on('joinGame', (data: { gameId: string; playerName: string }) => this.handlePlayerJoin(socket, data.gameId, data.playerName));
-        socket.on('requestPossibleMoves', (data: { from: Position }) => this.handleRequestPossibleMoves(socket, data.from));
+        socket.on('requestPossibleMoves', (data: { from: Position}, callback:(res:PossibleMovesResponse) => void) => this.handleRequestPossibleMoves(socket, data.from, callback));
         socket.on('makeMove', (data: { from: Position; to: Position; promotionType?: PieceType }) => this.handleMakeMove(socket, data.from, data.to, data.promotionType));
         socket.on('disconnect', () => this.handlePlayerDisconnect(socket));
 
@@ -80,6 +82,7 @@ export class GameManager {
     // --- Implementações dos Handlers de Socket.IO (os antigos "socketHandlers") ---
 
     private handlePlayerJoin(socket: Socket, gameId: string, playerName: string): void {
+        console.log('teste')
         const game = this.getGame(gameId);
         if (!game) {
             socket.emit('joinError', { message: 'Game not found' });
@@ -101,11 +104,10 @@ export class GameManager {
             // Se o jogador já existe, atualiza o socketId (caso de reconexão)
             player.socketId = socket.id;
         }
-
+        
         socket.join(gameId);
         this.socketToGameMap.set(socket.id, gameId); // Mapeia socketId para gameId
         socket.data.gameId = gameId; // Opcional, mas útil para acesso rápido
-
         // Envia estado inicial para o jogador que acabou de entrar
         socket.emit('joinedGame', {
             gameId: gameId,
@@ -124,7 +126,8 @@ export class GameManager {
         console.log(`Player ${playerName} (${socket.id}) joined game ${gameId}`);
     }
 
-    private handleRequestPossibleMoves(socket: Socket, from: Position): void {
+    private handleRequestPossibleMoves(socket: Socket, from: Position, callback): void {
+        
         const gameId = this.socketToGameMap.get(socket.id);
         if (!gameId) {
             socket.emit('error', { message: 'Not in a game to request moves.' });
@@ -147,8 +150,8 @@ export class GameManager {
             socket.emit('possibleMovesResponse', { normalMoves: [], captureMoves: [], message: 'No piece or not your piece.' });
             return;
         }
-
         const { normalMoves, captureMoves } = game.possibleMoves(piece);
+        callback({normalMoves, captureMoves}); //aqui vou colocar todos os dados que quero devolver para a 'requisição
         socket.emit('possibleMovesResponse', { normalMoves, captureMoves });
         console.log(`Possible moves requested by ${socket.id} for game ${gameId}`);
     }
