@@ -42,11 +42,21 @@ io.use((socket, next) => {
         socket.userID = userID;
         return next();
       }
-      }
+      console.log('chegaaqui')
+      socket.userID = randomUUID();
+      socket.gameID = gameID;
     }
-  // socket.gameID = gameManager.createNewGame();
-  // socket.userID = randomUUID();
-  next(); 
+    return next(); //retorna nada se o id do game nao existir //front deve voltar ao menu
+  }
+  if(gameID && !userID){
+      socket.userID = randomUUID();
+      next();
+  }
+  if(!userID && !gameID){
+    socket.gameID = gameManager.createNewGame();
+      socket.userID = randomUUID();
+      next(); 
+  }
 })
 
 

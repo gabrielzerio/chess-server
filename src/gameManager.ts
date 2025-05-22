@@ -75,7 +75,9 @@ export class GameManager {
     // Este método é chamado uma vez quando um novo socket se conecta
     public handleSocketConnection(socket: Socket): void {
         console.log(`Socket connected: ${socket.userID}`);
-        socket.on('requestGameAndUserID', (callback:(res:GameAndUserID) => void) => this.requestGameInfos(socket, callback));
+        socket.emit('session', {gameID:socket.gameID, userID:socket.userID});
+        console.log('envia session')
+        // socket.on('requestGameAndUserID', (callback:(res:GameAndUserID) => void) => this.requestGameInfos(socket, callback));
         // O 'this' deve se referir à instância do GameManager
         // socket.on('joinGame', (data: { gameId: string; playerName: string }) => this.handlePlayerJoin(socket, data.gameId, data.playerName));
         socket.on('joinGame', () => this.handlePlayerJoin(socket));
@@ -96,22 +98,25 @@ export class GameManager {
 
     // private handlePlayerJoin(socket: Socket, gameId: string, playerName: string): void {
     private handlePlayerJoin(socket: Socket): void {
-        
+            const userID = socket.userID;
+        if(!userID){
+            socket.emit('joinError', {message:'userID don"t exists'})
+        }
         const game = this.getGame(socket.gameID);
+        
         if (!game) {
             socket.emit('joinError', { message: 'Game not found' });
             return;
         }
-        if (game.getPlayers().length >= 2) {
-            socket.emit('joinError', { message: 'Game is full' });
-            return;
-        }
+        
 
         // Tenta encontrar o jogador existente (para reconexão) ou adiciona um novo
         let player = game.getPlayerByUserID(socket.userID);
-        console.log('achou o playr', player)
         if (!player) {
-         
+         if (game.getPlayers().length >= 2) {
+            socket.emit('joinError', { message: 'Game is full' });
+            return;
+        } 
             // Se o jogador não existe pelo nome, cria um novo
             const color: 'white' | 'black' = game.getPlayers().length === 0 ? 'white' : 'black';
             // player = { name: playerName, userID:socket.userID, color: color };
@@ -170,7 +175,6 @@ export class GameManager {
         const { normalMoves, captureMoves } = game.possibleMoves(piece);
         callback({normalMoves, captureMoves}); //aqui vou colocar todos os dados que quero devolver para a 'requisição
         // socket.emit('possibleMovesResponse', { normalMoves, captureMoves }); 
-        console.log(normalMoves)
         console.log(`Possible moves requested by ${socket.userID} for game ${socket.gameID}`);
     }
 

@@ -120,7 +120,6 @@ export class Game {
         if (from.row < 0 || from.row >= 8 || from.col < 0 || from.col >= 8) {
             return null;
         }
-        console.log(this.board);
         const piece = this.board[from.row][from.col];
         return piece;
     }
@@ -249,8 +248,6 @@ export class Game {
         }
 
         const piece = this.getSelectedPiece(from);
-        console.log(from)
-        console.log(piece);
         if (!piece || piece.color !== this.turn) {
             return { success: false, message: 'No piece selected or not your piece.' };
         }
