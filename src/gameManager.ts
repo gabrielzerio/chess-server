@@ -4,6 +4,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { Game } from './class/game'; // Sua classe Game
 import { Player, Board, Position, PieceType } from './models/types'; // Seus tipos
 import { createInitialBoard } from './utils/boardSetup'; // Sua função de criação de tabuleiro
+import { randomUUID } from 'crypto';
 
 // Definindo o tipo para a coleção de jogos
 interface ActiveGames {
@@ -87,6 +88,8 @@ export class GameManager {
         // Ex: socket.on('chatMessage', (data) => this.handleChatMessage(socket, data));
     }
     private requestGameInfos(socket:Socket, callback:(res:GameAndUserID) => void):void {
+         socket.gameID = this.createNewGame();
+        socket.userID = randomUUID();
         callback({gameID:socket.gameID, userID:socket.userID});
     }
     // --- Implementações dos Handlers de Socket.IO (os antigos "socketHandlers") ---
@@ -172,17 +175,19 @@ export class GameManager {
     }
 
     private async handleMakeMove(socket: Socket, from: Position, to: Position, promotionType?: PieceType): Promise<void> {
-        const gameId = this.socketToGameMap.get(socket.id);
+        // const gameId = this.socketToGameMap.get(socket.id);
+        const gameId = this.games[socket.gameID].getPlayerByUserID(socket.userID);
+
         if (!gameId) {
             socket.emit('moveError', { message: 'Not in a game to make a move.' });
             return;
         }
-        const game = this.getGame(gameId);
+        const game = this.getGame(socket.gameID);
         if (!game) {
             socket.emit('moveError', { message: 'Associated game not found.' });
             return;
         }
-
+        game.setStatus('playing')
         if (game.getStatus() !== 'playing') {
              socket.emit('moveError', { message: 'Game is not in playing state.' });
              return;
@@ -191,17 +196,17 @@ export class GameManager {
         const piece = game.getSelectedPiece(from);
         if(!piece) return;
         
-        const moveResult = await game.applyMove(socket.id, to, from, promotionType);
-
+        const moveResult = await game.applyMove(socket.userID, from, to, promotionType);
+        // console.log(moveResult.message);
         if (moveResult.success) {
-            this.io.to(gameId).emit('boardUpdate', { board: moveResult.board, turn: moveResult.turn, status: moveResult.status });
+            this.io.to(socket.gameID).emit('boardUpdate', { board: moveResult.board, turn: moveResult.turn, status: moveResult.status });
             if (moveResult.winner) {
-                this.io.to(gameId).emit('gameOver', { winner: moveResult.winner, status: moveResult.status });
+                this.io.to(socket.gameID).emit('gameOver', { winner: moveResult.winner, status: moveResult.status });
                 // Considera remover o jogo se ele acabou
                 // this.deleteGame(gameId); // Descomentar se quiser remover automaticamente
             } else if (moveResult.status === 'checkmate') {
                 // Caso específico de xeque-mate sem winner direto no retorno, trate aqui
-                 this.io.to(gameId).emit('gameOver', { winner: game.getTurn() === 'white' ? 'black' : 'white', status: moveResult.status });
+                 this.io.to(socket.gameID).emit('gameOver', { winner: game.getTurn() === 'white' ? 'black' : 'white', status: moveResult.status });
                  // this.deleteGame(gameId);
             }
         } else {

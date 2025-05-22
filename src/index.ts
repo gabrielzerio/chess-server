@@ -32,13 +32,10 @@ const gameManager = new GameManager(io);
 
 io.use((socket, next) => {
   const {userID, gameID} = socket.handshake.auth;
-  console.log(userID, gameID)
   if(gameID){
     const game = gameManager.getGame(gameID);
     if(game){
       const player = game.getPlayerByUserID(userID);
-      console.log('ouserid ', userID)
-      console.log('templayer tamboem', player)
       if(player){
         console.log('temgameID')
         socket.gameID = gameID;
@@ -47,8 +44,8 @@ io.use((socket, next) => {
       }
       }
     }
-  socket.gameID = gameManager.createNewGame();
-  socket.userID = randomUUID();
+  // socket.gameID = gameManager.createNewGame();
+  // socket.userID = randomUUID();
   next(); 
 })
 
