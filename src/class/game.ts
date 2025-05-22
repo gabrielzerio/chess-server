@@ -54,7 +54,7 @@ export class Game {
     addPlayer(player: Player): boolean {
         if (this.players.length >= 2) return false;
         // Evita adicionar o mesmo jogador (pelo nome) duas vezes
-        if (this.players.some(p => p.name === player.name)) return false;
+        // if (this.players.some(p => p.name === player.name)) return false;
 
         this.players.push(player);
         if (this.players.length === 2 && this.status === 'waiting') {
@@ -64,25 +64,25 @@ export class Game {
     }
 
     // NOVO: Retorna o jogador pelo socketId ou undefined
-    public getPlayerBySocketId(socketId: string): Player | undefined {
-        return this.players.find(p => p.socketId === socketId);
+    public getPlayerByUserID(userID: string): Player | undefined {
+        return this.players.find(p => p.userID === userID);
     }
 
     // Refatorado: Retorna o jogador pelo nome ou undefined, sem lançar erro
-    public getPlayerByName(playerName: string): Player | undefined {
-        return this.players.find(p => p.name === playerName);
-    }
+    // public getPlayerByName(playerName: string): Player | undefined {
+    //     return this.players.find(p => p.name === playerName);
+    // }
 
     // Aprimorado: Gerencia a desconexão do jogador
-    public removePlayerBySocketId(socketId: string): Player | null {
-        const player = this.getPlayerBySocketId(socketId);
+    public removePlayerByUserID(userID: string): Player | null {
+        const player = this.getPlayerByUserID(userID);
         if (player) {
             // Apenas define o socketId para null (permite reconexão ou slot vazio)
-            player.socketId = null;
-            console.log(`Player ${player.name} (${socketId}) disconnected. SocketId set to null.`);
+            player.userID = null;
+            console.log(`Player ${player.name} (${userID}) disconnected. SocketId set to null.`);
 
             // Lógica adicional para o estado do jogo ao desconectar
-            const activePlayers = this.players.filter(p => p.socketId !== null);
+            const activePlayers = this.players.filter(p => p.userID !== null);
             if (this.status === 'playing' && activePlayers.length < 2) {
                 this.status = 'paused'; // Ou 'abandoned'
                 console.log(`Game status changed to ${this.status} due to player disconnection.`);
@@ -242,7 +242,7 @@ export class Game {
 
     // NOVO: Método principal para aplicar um movimento, retorna um resultado estruturado
     public async applyMove(socketId: string, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
-        const player = this.getPlayerBySocketId(socketId);
+        const player = this.getPlayerByUserID(socketId);
         if (!player || player.color !== this.turn) {
             return { success: false, message: 'Not your turn or player not found.' };
         }

@@ -5,6 +5,15 @@ import {Server} from 'socket.io';
 import gameRoutes from './router/gameRoutes';
 import { GameManager } from './gameManager';
 import * as gameController from './router/gameController'
+import { randomUUID } from 'crypto';
+
+// Extend Socket type to include username property
+declare module 'socket.io' {
+  interface Socket {
+    userID: string;
+    gameID:string;
+  }
+}
 
 const app: express.Application = express();
 
@@ -20,6 +29,30 @@ const io = new Server(server, {
 });
 
 const gameManager = new GameManager(io);
+
+io.use((socket, next) => {
+  const {userID, gameID} = socket.handshake.auth;
+  console.log(userID, gameID)
+  if(gameID){
+    const game = gameManager.getGame(gameID);
+    if(game){
+      const player = game.getPlayerByUserID(userID);
+      console.log('ouserid ', userID)
+      console.log('templayer tamboem', player)
+      if(player){
+        console.log('temgameID')
+        socket.gameID = gameID;
+        socket.userID = userID;
+        return next();
+      }
+      }
+    }
+  socket.gameID = gameManager.createNewGame();
+  socket.userID = randomUUID();
+  next(); 
+})
+
+
 gameController.setGameManager(gameManager);
 
  io.on('connection', (socket) => {

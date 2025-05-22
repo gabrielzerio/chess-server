@@ -14,7 +14,7 @@ export interface EnPassantTarget {
 export interface Player{
  name: string; 
  color: PieceColor; 
- socketId: string | null;
+ userID: string | null;
 }
 
 // Import da classe base Piece
