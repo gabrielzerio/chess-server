@@ -75,11 +75,11 @@ export class GameManager {
     // Este método é chamado uma vez quando um novo socket se conecta
     public handleSocketConnection(socket: Socket): void {
         console.log(`Socket connected: ${socket.userID}`);
-        socket.emit('session', {gameID:socket.gameID, userID:socket.userID});
         console.log('envia session')
         // socket.on('requestGameAndUserID', (callback:(res:GameAndUserID) => void) => this.requestGameInfos(socket, callback));
         // O 'this' deve se referir à instância do GameManager
         // socket.on('joinGame', (data: { gameId: string; playerName: string }) => this.handlePlayerJoin(socket, data.gameId, data.playerName));
+        socket.emit('session', {gameID:socket.gameID, userID:socket.userID});
         socket.on('joinGame', () => this.handlePlayerJoin(socket));
         socket.on('requestPossibleMoves', (data: { from: Position}, callback:(res:PossibleMovesResponse) => void) => this.handleRequestPossibleMoves(socket, data.from, callback));
         // socket.on('requestPossibleMoves', (data: { from: Position }) => this.handleRequestPossibleMoves(socket, data.from));
@@ -230,7 +230,7 @@ export class GameManager {
             const disconnectedPlayer = game.removePlayerByUserID(socket.id); // Marca o player como desconectado
             // this.socketToGameMap.delete(socket.id); // Remove do mapa de sockets
             this.io.to(gameId).emit('playersUpdate', { players: game.getPlayers() }); // Notifica a sala
-
+            
             // Lógica para lidar com o jogo quando um jogador desconecta
             // Se o jogo estava 'playing' e agora só tem 1 jogador ativo, o status pode mudar para 'paused' ou 'abandoned'
             if (game.getStatus() === 'playing' && game.getPlayers().filter(p => p.userID !== null).length < 2) {

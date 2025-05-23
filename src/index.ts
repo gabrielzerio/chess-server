@@ -42,7 +42,6 @@ io.use((socket, next) => {
         socket.userID = userID;
         return next();
       }
-      console.log('chegaaqui')
       socket.userID = randomUUID();
       socket.gameID = gameID;
     }
