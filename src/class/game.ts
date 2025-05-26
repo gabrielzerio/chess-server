@@ -64,8 +64,8 @@ export class Game {
     }
 
     // NOVO: Retorna o jogador pelo socketId ou undefined
-    public getPlayerByUserID(userID: string): Player | undefined {
-        return this.players.find(p => p.userID === userID);
+    public getPlayerByID(playerID: string): Player | undefined {
+        return this.players.find(p => p.playerID === playerID);
     }
 
     // Refatorado: Retorna o jogador pelo nome ou undefined, sem lançar erro
@@ -74,15 +74,15 @@ export class Game {
     // }
 
     // Aprimorado: Gerencia a desconexão do jogador
-    public removePlayerByUserID(userID: string): Player | null {
-        const player = this.getPlayerByUserID(userID);
+    public removePlayerByPlayerID(playerID: string): Player | null {
+        const player = this.getPlayerByID(playerID);
         if (player) {
             // Apenas define o socketId para null (permite reconexão ou slot vazio)
-            player.userID = null;
-            console.log(`Player ${player.name} (${userID}) disconnected. SocketId set to null.`);
+            player.playerID = null;
+            console.log(`Player ${player.name} (${playerID}) disconnected. SocketId set to null.`);
 
             // Lógica adicional para o estado do jogo ao desconectar
-            const activePlayers = this.players.filter(p => p.userID !== null);
+            const activePlayers = this.players.filter(p => p.playerID !== null);
             if (this.status === 'playing' && activePlayers.length < 2) {
                 this.status = 'paused'; // Ou 'abandoned'
                 console.log(`Game status changed to ${this.status} due to player disconnection.`);
@@ -242,7 +242,7 @@ export class Game {
 
     // NOVO: Método principal para aplicar um movimento, retorna um resultado estruturado
     public async applyMove(socketId: string, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
-        const player = this.getPlayerByUserID(socketId);
+        const player = this.getPlayerByID(socketId);
         if (!player || player.color !== this.turn) {
             return { success: false, message: 'Not your turn or player not found.' };
         }

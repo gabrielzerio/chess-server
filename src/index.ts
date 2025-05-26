@@ -10,7 +10,7 @@ import { randomUUID } from 'crypto';
 // Extend Socket type to include username property
 declare module 'socket.io' {
   interface Socket {
-    userID: string;
+    playerID: string;
     gameID:string;
   }
 }
@@ -31,31 +31,35 @@ const io = new Server(server, {
 const gameManager = new GameManager(io);
 
 io.use((socket, next) => {
-  const {userID, gameID} = socket.handshake.auth;
-  if(gameID){
-    const game = gameManager.getGame(gameID);
-    if(game){
-      const player = game.getPlayerByUserID(userID);
-      if(player){
-        console.log('temgameID')
-        socket.gameID = gameID;
-        socket.userID = userID;
-        return next();
-      }
-      socket.userID = randomUUID();
-      socket.gameID = gameID;
-    }
-    return next(); //retorna nada se o id do game nao existir //front deve voltar ao menu
-  }
-  if(gameID && !userID){
-      socket.userID = randomUUID();
-      next();
-  }
-  if(!userID && !gameID){
-    socket.gameID = gameManager.createNewGame();
-      socket.userID = randomUUID();
-      next(); 
-  }
+  const {playerID, gameID} = socket.handshake.auth;
+  socket.playerID = playerID;
+  socket.gameID = gameID;
+  console.log(socket.gameID)
+  // if(gameID){
+  //   const game = gameManager.getGame(gameID);
+  //   if(game){
+  //     const player = game.getPlayerByUserID(userID);
+  //     if(player){
+  //       console.log('temgameID')
+  //       socket.gameID = gameID;
+  //       socket.userID = userID;
+  //       return next();
+  //     }
+  //     socket.userID = randomUUID();
+  //     socket.gameID = gameID;
+  //   }
+  //   return next(); //retorna nada se o id do game nao existir //front deve voltar ao menu
+  // }
+  // if(gameID && !userID){
+  //     socket.userID = randomUUID();
+  //     next();
+  // }
+  // if(!userID && !gameID){
+  //   socket.gameID = gameManager.createNewGame();
+  //     socket.userID = randomUUID();
+  //     next(); 
+  // }
+  next();
 })
 
 

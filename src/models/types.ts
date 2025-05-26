@@ -13,8 +13,13 @@ export interface EnPassantTarget {
 
 export interface Player{
  name: string; 
- color: PieceColor; 
- userID: string | null;
+ color?: PieceColor; 
+ playerID: string | null;
+}
+
+export interface GameAndPlayerID{
+    gameID: string;
+    playerID:string;
 }
 
 // Import da classe base Piece
