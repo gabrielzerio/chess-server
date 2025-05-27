@@ -31,7 +31,7 @@ export const createGame = (req: Request, res: Response):Response<GameAndPlayerID
         //  color?: PieceColor; 
         //  playerID: string | null;
 
-        gameManagerInstance.getGame(gameID).addPlayer(player)
+        // gameManagerInstance.getGame(gameID).addPlayer(player)
         }catch(error){
             console.log(error);
         }

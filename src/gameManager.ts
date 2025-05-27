@@ -226,7 +226,7 @@ export class GameManager {
 
         const game = this.getGame(gameId);
         if (game) {
-            const disconnectedPlayer = game.removePlayerByplayerID(socket.id); // Marca o player como desconectado
+            // const disconnectedPlayer = game.removePlayerByplayerID(socket.id); // Marca o player como desconectado
             // this.socketToGameMap.delete(socket.id); // Remove do mapa de sockets
             this.io.to(gameId).emit('playersUpdate', { players: game.getPlayers() }); // Notifica a sala
             
@@ -234,7 +234,7 @@ export class GameManager {
             // Se o jogo estava 'playing' e agora só tem 1 jogador ativo, o status pode mudar para 'paused' ou 'abandoned'
             if (game.getStatus() === 'playing' && game.getPlayers().filter(p => p.playerID !== null).length < 2) {
                 game.setStatus('paused'); // ou 'abandoned'
-                this.io.to(gameId).emit('gamePaused', { message: `Player ${disconnectedPlayer?.name || 'unknown'} disconnected. Game paused.` });
+                // this.io.to(gameId).emit('gamePaused', { message: `Player ${disconnectedPlayer?.name || 'unknown'} disconnected. Game paused.` });
                 // Aqui você pode decidir se o jogo deve ser encerrado, se o outro jogador ganha, etc.
                 // Ex: Se o outro jogador ganha automaticamente:
                 // const winnerColor = disconnectedPlayer?.color === 'white' ? 'black' : 'white';
