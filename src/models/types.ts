@@ -22,6 +22,10 @@ export interface GameAndPlayerID{
     playerID:string;
 }
 
+export interface IAddPlayerError{
+
+} 
+
 // Import da classe base Piece
 import { Piece } from '../class/piece';
 export type Board = (Piece | null)[][];

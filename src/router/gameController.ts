@@ -14,7 +14,7 @@ export const setGameManager = (manager: GameManager) => {
     gameManagerInstance = manager;
 };
 
-export const createGame = (req: Request, res: Response):Response<GameAndPlayerID,any> => {
+export const createGame = (req: Request, res: Response):any => {
     try {
         if (!gameManagerInstance) {
             throw new Error('GameManager not initialized.');
@@ -24,16 +24,16 @@ export const createGame = (req: Request, res: Response):Response<GameAndPlayerID
         
         const player:Player = req.body;
         try{
-            console.log('o que retornou body',req.body.playerName)
+            // console.log('o que retornou body',req.body.playerName)
         console.log(player);
         player.playerID = playerID;
         //  name: string; 
         //  color?: PieceColor; 
         //  playerID: string | null;
 
-        // gameManagerInstance.getGame(gameID).addPlayer(player)
+        gameManagerInstance.getGame(gameID).addPlayer(player)
         }catch(error){
-            console.log(error);
+            console.log("erro ao adicionar jogador, nome duplicado ou sala cheia",error);
         }
         return res.json({ gameID:gameID, playerID:playerID });
     } catch (error: any) {

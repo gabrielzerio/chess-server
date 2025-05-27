@@ -1,6 +1,6 @@
 // class/game.ts
 
-import { Board, PieceColor, Position, EnPassantTarget, Player, PieceType } from '../models/types';
+import { Board, PieceColor, Position, EnPassantTarget, Player, PieceType, IAddPlayerError } from '../models/types';
 import { MoveContext, Piece } from './piece'; // Certifique-se de que Piece e MoveContext estão corretos
 import { PieceFactory } from '../models/PieceFactory';
 import { Pawn } from '../models/pieces/Pawn';
@@ -51,10 +51,10 @@ export class Game {
 
     // --- Métodos de Gerenciamento de Jogadores ---
 
-    addPlayer(player: Player): boolean {
+    addPlayer<IAddPlayerError>(player: Player): boolean {
         if (this.players.length >= 2) return false;
         // Evita adicionar o mesmo jogador (pelo nome) duas vezes
-        // if (this.players.some(p => p.name === player.name)) return false;
+        if (this.players.some(p => p.name === player.name)) return false;
 
         this.players.push(player);
         if (this.players.length === 2 && this.status === 'waiting') {
@@ -69,9 +69,9 @@ export class Game {
     }
 
     // Refatorado: Retorna o jogador pelo nome ou undefined, sem lançar erro
-    // public getPlayerByName(playerName: string): Player | undefined {
-    //     return this.players.find(p => p.name === playerName);
-    // }
+    public getPlayerByName(playerName: string): Player | undefined {
+        return this.players.find(p => p.name === playerName);
+    }
 
     // Aprimorado: Gerencia a desconexão do jogador
     public removePlayerByPlayerID(playerID: string): Player | null {

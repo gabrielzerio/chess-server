@@ -21,7 +21,7 @@ export class GameManager {
     private io: SocketIOServer;
     private games: ActiveGames = {}; // Armazena instâncias de Game por gameId
     // Map para rapidamente encontrar o gameId de um socket
-    // private socketToGameMap: Map<string, string> = new Map();
+    private socketToGameMap: Map<string, string> = new Map();
 
     constructor(io: SocketIOServer) {
         this.io = io;
@@ -69,12 +69,10 @@ export class GameManager {
         return game ? !!game.getPlayerByName(playerName) : false;
     }
 
-    // --- Métodos para Lidar com Conexões Socket.IO (chamados pelo main server) ---
 
-    // Este método é chamado uma vez quando um novo socket se conecta
+    // metodo é chamado uma vez quando um novo socket se conecta
     public handleSocketConnection(socket: Socket): void {
         console.log(`Socket connected: ${socket.playerID}`);
-        // console.log('envia session')
         // socket.on('requestGameAndplayerID', (callback:(res:GameAndplayerID) => void) => this.requestGameInfos(socket, callback));
         // O 'this' deve se referir à instância do GameManager
         // socket.on('joinGame', (data: { gameId: string; playerName: string }) => this.handlePlayerJoin(socket, data.gameId, data.playerName));
@@ -85,15 +83,12 @@ export class GameManager {
         socket.on('makeMove', (data: { from: Position; to: Position; promotionType?: PieceType }) => this.handleMakeMove(socket, data.from, data.to, data.promotionType));
         socket.on('disconnect', () => this.handlePlayerDisconnect(socket));
 
-        // Você pode adicionar mais listeners aqui para outros eventos do jogo
-        // Ex: socket.on('chatMessage', (data) => this.handleChatMessage(socket, data));
     }
     // private requestGameInfos(socket:Socket, callback:(res:GameAndplayerID) => void):void {
     //      socket.gameID = this.createNewGame();
     //     socket.playerID = randomUUID();
     //     callback({gameID:socket.gameID, playerID:socket.playerID});
     // }
-    // --- Implementações dos Handlers de Socket.IO (os antigos "socketHandlers") ---
 
     // private handlePlayerJoin(socket: Socket, gameId: string, playerName: string): void {
     private handlePlayerJoin(socket: Socket): void {
@@ -119,12 +114,14 @@ export class GameManager {
             // Se o jogador não existe pelo nome, cria um novo
             const color: 'white' | 'black' = game.getPlayers().length === 0 ? 'white' : 'black';
             // player = { name: playerName, playerID:socket.playerID, color: color };
-            player = { name: 'aa', playerID:socket.playerID, color: color };
+            const playerName = this.games[socket.gameID].getPlayerByID(socket.playerID);
+
+            player = { name:playerName , playerID:socket.playerID, color: color };
             game.addPlayer(player); // Adiciona o novo player à instância do Game
         } else {
             // Se o jogador já existe, atualiza o socketId (caso de reconexão)
             // player.socketId = socket.id;
-            console.log('ja existe')
+            console.log('Jogador já existe')
         }
         
         socket.join(socket.gameID);
