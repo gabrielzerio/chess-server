@@ -1,6 +1,6 @@
 // class/game.ts
 
-import { Board, PieceColor, Position, EnPassantTarget, Player, PieceType, IAddPlayerError } from '../models/types';
+import { Board, PieceColor, Position, EnPassantTarget, Player, PieceType, GameStatus, PlayerAlreadyExistsError, GameFullError } from '../models/types';
 import { MoveContext, Piece } from './piece'; // Certifique-se de que Piece e MoveContext estão corretos
 import { PieceFactory } from '../models/PieceFactory';
 import { Pawn } from '../models/pieces/Pawn';
@@ -12,7 +12,7 @@ export interface ApplyMoveResult {
     message?: string;
     board?: Board; // Board serializado
     turn?: PieceColor;
-    status?: string;
+    status?: GameStatus;
     winner?: PieceColor;
     isCheck?: boolean; // Adicionado para indicar xeque
 }
@@ -21,7 +21,7 @@ export class Game {
     private players: Player[];
     private board: Board;
     private turn: PieceColor;
-    private status: string; // Ex: 'waiting', 'playing', 'finished', 'paused'
+    private status: GameStatus; // Ex: 'waiting', 'playing', 'finished', 'paused'
     private enPassantTarget: EnPassantTarget | null;
 
     constructor(board: Board) {
@@ -42,25 +42,29 @@ export class Game {
     getPlayers(): Player[] {
         return this.players;
     }
-    getStatus(): string {
+    getStatus(): GameStatus {
         return this.status;
     }
-    setStatus(status: string): void {
+    setStatus(status: GameStatus): void {
         this.status = status;
     }
 
     // --- Métodos de Gerenciamento de Jogadores ---
 
-    addPlayer<IAddPlayerError>(player: Player): boolean {
-        if (this.players.length >= 2) return false;
-        // Evita adicionar o mesmo jogador (pelo nome) duas vezes
-        if (this.players.some(p => p.name === player.name)) return false;
-
-        this.players.push(player);
-        if (this.players.length === 2 && this.status === 'waiting') {
-            this.status = 'playing'; // Inicia o jogo se há 2 jogadores e estava esperando
-        }
-        return true;
+    addPlayer(player: Player): boolean {
+    if (this.players.length >= 2) {
+      throw new GameFullError(); // Lança exceção
+    }
+    if (this.players.some(p => p.playerName === player.playerName || p.playerID === player.playerID)) {
+      throw new PlayerAlreadyExistsError(); // Lança exceção
+    }
+    const color: 'white' | 'black' = this.getPlayers().length === 0 ? 'white' : 'black';
+    player.color = color;
+    this.players.push(player);
+    if (this.players.length === 2 && this.status === 'waiting') {
+      this.status = 'playing';
+    }
+    return true; // Retorna true se adicionado com sucesso 
     }
 
     // NOVO: Retorna o jogador pelo socketId ou undefined
@@ -70,7 +74,7 @@ export class Game {
 
     // Refatorado: Retorna o jogador pelo nome ou undefined, sem lançar erro
     public getPlayerByName(playerName: string): Player | undefined {
-        return this.players.find(p => p.name === playerName);
+        return this.players.find(p => p.playerName === playerName);
     }
 
     // Aprimorado: Gerencia a desconexão do jogador
@@ -79,12 +83,12 @@ export class Game {
         if (player) {
             // Apenas define o socketId para null (permite reconexão ou slot vazio)
             player.playerID = null;
-            console.log(`Player ${player.name} (${playerID}) disconnected. SocketId set to null.`);
+            console.log(`Player ${player.playerName} (${playerID}) disconnected. SocketId set to null.`);
 
             // Lógica adicional para o estado do jogo ao desconectar
             const activePlayers = this.players.filter(p => p.playerID !== null);
             if (this.status === 'playing' && activePlayers.length < 2) {
-                this.status = 'paused'; // Ou 'abandoned'
+                this.status = 'waiting'; // Ou 'abandoned'
                 console.log(`Game status changed to ${this.status} due to player disconnection.`);
             }
             return player;
@@ -287,7 +291,7 @@ export class Game {
 
         if (isCheckmate) {
             winner = this.turn === 'white' ? 'black' : 'white'; // O vencedor é o oposto do turno atual
-            finalStatus = 'finished';
+            finalStatus = 'ended';
             this.setStatus(finalStatus);
         } else {
             // Verifica se o próximo jogador (turno atual) está em xeque

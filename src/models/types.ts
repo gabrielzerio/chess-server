@@ -1,5 +1,7 @@
 export type PieceType = "pawn" | "rook" | "knight" | "bishop" | "queen" | "king";
 export type PieceColor = "white" | "black";
+export type ErrorCode = 'GAME_FULL' | 'PLAYER_ALREADY_EXISTS'
+export type GameStatus = 'waiting' | 'playing' | 'ended' | 'checkmate';
 
 export interface Position {
   row: number;
@@ -12,7 +14,7 @@ export interface EnPassantTarget {
 }
 
 export interface Player{
- name: string; 
+ playerName: string; 
  color?: PieceColor; 
  playerID: string | null;
 }
@@ -22,9 +24,39 @@ export interface GameAndPlayerID{
     playerID:string;
 }
 
-export interface IAddPlayerError{
+// export interface IAddPlayerResult {
+//   success: boolean;
+//   code?: ErrorCode // Códigos de erro específicos
+// }
 
-} 
+// export interface ICreateNewGameResult extends IAddPlayerResult {
+//   gameID?: string;
+// }
+
+
+export class GameError extends Error {
+  constructor(message: string, public code: string, public statusCode: number = 400) {
+    super(message);
+    this.name = this.constructor.name;
+    Object.setPrototypeOf(this, GameError.prototype);
+  }
+}
+
+export class GameFullError extends GameError {
+  constructor(message: string = 'Game is full.') {
+    super(message, 'GAME_FULL', 400);
+    Object.setPrototypeOf(this, GameFullError.prototype);
+  }
+}
+
+export class PlayerAlreadyExistsError extends GameError {
+  constructor(message: string = 'Player already in game.') {
+    super(message, 'PLAYER_ALREADY_EXISTS', 400);
+    Object.setPrototypeOf(this, PlayerAlreadyExistsError.prototype);
+  }
+}
+
+
 
 // Import da classe base Piece
 import { Piece } from '../class/piece';
