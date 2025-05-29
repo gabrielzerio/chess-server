@@ -258,13 +258,16 @@ export class Game {
 
         // Antes de tentar o movimento, verifique se o movimento é legal (não deixa o próprio rei em xeque)
         // Isso requer uma simulação do movimento e verificar o xeque
-        const originalBoard = JSON.parse(JSON.stringify(this.board)); // Cópia profunda
+        // const originalBoard = JSON.parse(JSON.stringify(this.board)); // Cópia profunda
+        const originalBoard = this.board // Cópia profunda
+        
         const originalEnPassantTarget = this.enPassantTarget;
         const originalTurn = this.turn;
 
         const moved = await this.canMove(piece, to, from, promotionType);
 
         if (!moved) {
+            console.log('tem como dar bo??')
             // Restaura o tabuleiro se o movimento falhou (se o canMove alterou algo temporariamente)
             this.board = originalBoard;
             this.enPassantTarget = originalEnPassantTarget;

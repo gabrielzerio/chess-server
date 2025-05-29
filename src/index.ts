@@ -50,6 +50,9 @@ io.use((socket, next) => {
   const {playerID, gameID} = socket.handshake.auth;
   socket.playerID = playerID;
   socket.gameID = gameID;
+  if(!socket.playerID || !socket.gameID)
+    return;
+
   next();
 })
 

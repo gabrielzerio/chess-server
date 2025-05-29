@@ -18,7 +18,7 @@ export class GameManager {
     private io: SocketIOServer;
     private games: ActiveGames = {}; // Armazena instâncias de Game por gameId
     // Map para rapidamente encontrar o gameId de um socket
-    private socketToGameMap: Map<string, string> = new Map();
+    // private socketToGameMap: Map<string, string> = new Map();
 
     constructor(io: SocketIOServer) {
         this.io = io;
@@ -26,7 +26,9 @@ export class GameManager {
 
     // --- Métodos de Gerenciamento de Jogos (chamados principalmente pelo Express, ou internamente) ---
 
-    public createNewGame(player:Player): string {
+    public createNewGame(player:Player): string | undefined {
+        if(!player.playerID)
+            return;
         const gameId = Math.random().toString(36).substr(2, 4);
         const game = new Game(createInitialBoard());
         try {
@@ -51,12 +53,6 @@ export class GameManager {
             this.io.to(gameId).emit('gameDeleted', { gameId, message: 'Game has been deleted.' });
             // Remover sockets da sala e do map
             this.io.sockets.in(gameId).socketsLeave(gameId);
-            this.socketToGameMap.forEach((gId, playerID) => {
-                if (gId === gameId) {
-                    this.socketToGameMap.delete(playerID);
-                }
-            });
-
             delete this.games[gameId];
             console.log(`Game deleted: ${gameId}`);
             return true;
@@ -121,7 +117,6 @@ export class GameManager {
         // game.addPlayer(player); // Adiciona o novo player à instância do Game
         
         socket.join(socket.gameID);
-        // this.socketToGameMap.set(socket.playerID, gameId); // Mapeia socketId para gameId
         // socket.data.gameId = gameId; // Opcional, mas útil para acesso rápido
         // Envia estado inicial para o jogador que acabou de entrar
         socket.emit('joinedGame', {
@@ -132,7 +127,7 @@ export class GameManager {
             status: game.getStatus()
         });
         // Notifica todos na sala sobre a atualização dos jogadores
-        this.io.to(socket.gameID).emit('playersUpdate', { players: game.getPlayers() });
+        // this.io.to(socket.gameID).emit('playersUpdate', { players: game.getPlayers() });
 
         if (game.getPlayers().length === 2 && game.getStatus() === 'waiting') {
             game.setStatus('playing'); // Inicia o jogo se 2 jogadores
@@ -183,11 +178,11 @@ export class GameManager {
             socket.emit('moveError', { message: 'Associated game not found.' });
             return;
         }
-        game.setStatus('playing')
         if (game.getStatus() !== 'playing') {
-             socket.emit('moveError', { message: 'Game is not in playing state.' });
-             return;
+            socket.emit('moveError', { message: 'Game is not in playing state.' });
+            return;
         }
+        game.setStatus('playing')
 
         const piece = game.getSelectedPiece(from);
         if(!piece) return;
