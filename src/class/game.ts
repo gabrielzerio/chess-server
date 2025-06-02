@@ -52,19 +52,17 @@ export class Game {
     // --- Métodos de Gerenciamento de Jogadores ---
 
     addPlayer(player: Player): boolean {
-    if (this.players.length >= 2) {
-      throw new GameFullError(); // Lança exceção
-    }
-    if (this.players.some(p => p.playerName === player.playerName || p.playerID === player.playerID)) {
-      throw new PlayerAlreadyExistsError(); // Lança exceção
-    }
-    const color: 'white' | 'black' = this.getPlayers().length === 0 ? 'white' : 'black';
-    player.color = color;
-    this.players.push(player);
-    if (this.players.length === 2 && this.status === 'waiting') {
-      this.status = 'playing';
-    }
-    return true; // Retorna true se adicionado com sucesso 
+        if (this.players.length >= 2) {
+            throw new GameFullError(); // Lança exceção
+        }
+        if (this.players.some(p => p.playerName === player.playerName || p.playerID === player.playerID)) {
+            throw new PlayerAlreadyExistsError(); // Lança exceção
+        }
+        const color: 'white' | 'black' = this.getPlayers().length === 0 ? 'white' : 'black';
+        player.color = color;
+        player.isOnline = true;
+        this.players.push(player);
+        return true; // Retorna true se adicionado com sucesso 
     }
 
     // NOVO: Retorna o jogador pelo socketId ou undefined
@@ -78,24 +76,42 @@ export class Game {
     }
 
     // Aprimorado: Gerencia a desconexão do jogador
-    public removePlayerByPlayerID(playerID: string): Player | null {
+    // public removePlayerByPlayerID(playerID: string): Player | null {
+    //     const player = this.getPlayerByID(playerID);
+    //     if (player) {
+    //         // Apenas define o socketId para null (permite reconexão ou slot vazio)
+    //         player.playerID = null;
+    //         console.log(`Player ${player.playerName} (${playerID}) disconnected. SocketId set to null.`);
+
+    //         // Lógica adicional para o estado do jogo ao desconectar
+    //         const activePlayers = this.players.filter(p => p.playerID !== null);
+    //         if (this.status === 'playing' && activePlayers.length < 2) {
+    //             this.status = 'waiting'; // Ou 'abandoned'
+    //             console.log(`Game status changed to ${this.status} due to player disconnection.`);
+    //         }
+    //         return player;
+    //     }
+    //     return null;
+    // }
+
+    public setPlayerOnlineStatus(playerID: string, isOnline: boolean): Player | null {
         const player = this.getPlayerByID(playerID);
         if (player) {
-            // Apenas define o socketId para null (permite reconexão ou slot vazio)
-            player.playerID = null;
-            console.log(`Player ${player.playerName} (${playerID}) disconnected. SocketId set to null.`);
-
-            // Lógica adicional para o estado do jogo ao desconectar
-            const activePlayers = this.players.filter(p => p.playerID !== null);
-            if (this.status === 'playing' && activePlayers.length < 2) {
-                this.status = 'waiting'; // Ou 'abandoned'
-                console.log(`Game status changed to ${this.status} due to player disconnection.`);
+            player.isOnline = isOnline;
+            if (!isOnline) {
+                player.disconnectedAt = Date.now();
+                console.log(`Player ${player.playerName} (${playerID}) marked as offline.`);
+            } else {
+                delete player.disconnectedAt; // Remove o timestamp ao reconectar
+                console.log(`Player ${player.playerName} (${playerID}) marked as online.`);
             }
             return player;
         }
         return null;
     }
-
+    public getActivePlayersCount(): number {
+        return this.players.filter(p => p.playerID && p.isOnline).length;
+    }
     // --- Métodos de Tabuleiro e Peças (mantidos e aprimorados se necessário) ---
 
     deserializeBoard(): Board {
@@ -260,7 +276,7 @@ export class Game {
         // Isso requer uma simulação do movimento e verificar o xeque
         // const originalBoard = JSON.parse(JSON.stringify(this.board)); // Cópia profunda
         const originalBoard = this.board // Cópia profunda
-        
+
         const originalEnPassantTarget = this.enPassantTarget;
         const originalTurn = this.turn;
 

@@ -19,6 +19,7 @@ export class GameManager {
     private games: ActiveGames = {}; // Armazena instâncias de Game por gameId
     // Map para rapidamente encontrar o gameId de um socket
     // private socketToGameMap: Map<string, string> = new Map();
+    private reconnectionTimers: Map<string, { timer: NodeJS.Timeout, disconnectedPlayerID: string }> = new Map();
 
     constructor(io: SocketIOServer) {
         this.io = io;
@@ -84,7 +85,7 @@ export class GameManager {
     private handlePlayerJoin(socket: Socket): void {
         const playerID = socket.playerID;
         const game = this.getGame(socket.gameID);
-        
+        const gameId = socket.gameID;
         if(!playerID){
             socket.emit('joinError', {message:"playerID don't exists null or undefined"})
             return;
@@ -127,11 +128,10 @@ export class GameManager {
             status: game.getStatus()
         });
         // Notifica todos na sala sobre a atualização dos jogadores
-        // this.io.to(socket.gameID).emit('playersUpdate', { players: game.getPlayers() });
-
+        // this.io.to(socket.gameID).emit('playersUpdate', { player: player?.playerName});
         if (game.getPlayers().length === 2 && game.getStatus() === 'waiting') {
             game.setStatus('playing'); // Inicia o jogo se 2 jogadores
-            this.io.to(socket.gameID).emit('gameStarted', { status: 'playing' });
+            this.io.to(socket.gameID).emit('gameStarted');
         }
         console.log(`Player ${player?.playerName} (${socket.playerID}) joined game ${socket.gameID}`);
     }
@@ -205,8 +205,9 @@ export class GameManager {
         }
     }
 
-    private handlePlayerDisconnect(socket: Socket): void {
+    private async handlePlayerDisconnect(socket: Socket): Promise<void> {
         const gameId = socket.gameID;
+        const playerName = this.getGame(gameId).getPlayerByID(socket.playerID);
         if (!gameId) {
             console.log(`Socket ${socket.id} disconnected, not in an active game.`);
             return;
@@ -220,9 +221,10 @@ export class GameManager {
             
             // Lógica para lidar com o jogo quando um jogador desconecta
             // Se o jogo estava 'playing' e agora só tem 1 jogador ativo, o status pode mudar para 'paused' ou 'abandoned'
-            if (game.getStatus() === 'playing' && game.getPlayers().filter(p => p.playerID !== null).length < 2) {
+            const sockets = await this.io.in(gameId).fetchSockets();
+            if (game.getStatus() === 'playing' && sockets.length < 2) {
                 game.setStatus('waiting'); // ou 'abandoned'
-                // this.io.to(gameId).emit('gamePaused', { message: `Player ${disconnectedPlayer?.name || 'unknown'} disconnected. Game paused.` });
+                this.io.to(gameId).emit('gamePaused', { message: `Jogador ${playerName || 'unknown'} disconnected. Game paused.` });
                 // Aqui você pode decidir se o jogo deve ser encerrado, se o outro jogador ganha, etc.
                 // Ex: Se o outro jogador ganha automaticamente:
                 // const winnerColor = disconnectedPlayer?.color === 'white' ? 'black' : 'white';

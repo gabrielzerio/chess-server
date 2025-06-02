@@ -52,7 +52,7 @@ io.use((socket, next) => {
   socket.gameID = gameID;
   if(!socket.playerID || !socket.gameID)
     return;
-
+  
   next();
 })
 
