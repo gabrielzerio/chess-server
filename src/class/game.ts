@@ -5,6 +5,7 @@ import { MoveContext, Piece } from './piece'; // Certifique-se de que Piece e Mo
 import { PieceFactory } from '../models/PieceFactory';
 import { Pawn } from '../models/pieces/Pawn';
 import { King } from '../models/pieces/King';
+import { randomUUID } from 'crypto';
 
 // Interface para o retorno do applyMove, para ser mais claro
 export interface ApplyMoveResult {
@@ -51,18 +52,26 @@ export class Game {
 
     // --- Métodos de Gerenciamento de Jogadores ---
 
-    addPlayer(player: Player): boolean {
-        if (this.players.length >= 2) {
+    addPlayer(playerName:string): Player {
+        if (this.getActivePlayersCount() >= 2) {
             throw new GameFullError(); // Lança exceção
         }
-        if (this.players.some(p => p.playerName === player.playerName || p.playerID === player.playerID)) {
+        if (this.players.some(p => p.playerName === playerName) && this.getPlayerByName(playerName)?.isOnline) {
             throw new PlayerAlreadyExistsError(); // Lança exceção
         }
+        const rescuePlayer = this.getPlayerByName(playerName);
+        if (rescuePlayer && !rescuePlayer.isOnline) {
+            return rescuePlayer;
+        }
+        const genID = randomUUID();
         const color: 'white' | 'black' = this.getPlayers().length === 0 ? 'white' : 'black';
+
+        const player:Player = {playerID:genID, playerName:playerName};
         player.color = color;
-        player.isOnline = true;
+        player.isOnline = true; // Jogador está online ao ser adicionado
         this.players.push(player);
-        return true; // Retorna true se adicionado com sucesso 
+        console.log(this.players);
+        return player; // Retorna true se adicionado com sucesso 
     }
 
     // NOVO: Retorna o jogador pelo socketId ou undefined
@@ -75,25 +84,7 @@ export class Game {
         return this.players.find(p => p.playerName === playerName);
     }
 
-    // Aprimorado: Gerencia a desconexão do jogador
-    // public removePlayerByPlayerID(playerID: string): Player | null {
-    //     const player = this.getPlayerByID(playerID);
-    //     if (player) {
-    //         // Apenas define o socketId para null (permite reconexão ou slot vazio)
-    //         player.playerID = null;
-    //         console.log(`Player ${player.playerName} (${playerID}) disconnected. SocketId set to null.`);
-
-    //         // Lógica adicional para o estado do jogo ao desconectar
-    //         const activePlayers = this.players.filter(p => p.playerID !== null);
-    //         if (this.status === 'playing' && activePlayers.length < 2) {
-    //             this.status = 'waiting'; // Ou 'abandoned'
-    //             console.log(`Game status changed to ${this.status} due to player disconnection.`);
-    //         }
-    //         return player;
-    //     }
-    //     return null;
-    // }
-
+    // NOVO: Marca um jogador como desconectado
     public setPlayerOnlineStatus(playerID: string, isOnline: boolean): Player | null {
         const player = this.getPlayerByID(playerID);
         if (player) {
@@ -109,9 +100,23 @@ export class Game {
         }
         return null;
     }
+
+    // NOVO: Conta jogadores ativos (online e com playerID)
     public getActivePlayersCount(): number {
         return this.players.filter(p => p.playerID && p.isOnline).length;
     }
+
+    // Aprimorado: Gerencia a desconexão do jogador (usado internamente ou se precisar da lógica antiga)
+    // public removePlayerByPlayerID(playerID: string): Player | null {
+    //     const player = this.getPlayerByID(playerID);
+    //     if (player) {
+    //         player.playerID = null; // Isso era para liberar o slot, mas para reconexão, melhor manter o ID e usar 'isOnline'
+    //         player.isOnline = false;
+    //         console.log(`Player ${player.playerName} (${playerID}) slot potentially freed. Marked as offline.`);
+    //     }
+    //     return player;
+    // }
+
     // --- Métodos de Tabuleiro e Peças (mantidos e aprimorados se necessário) ---
 
     deserializeBoard(): Board {

@@ -25,11 +25,11 @@ export const createGame = (req: Request, res: Response):any => {
             throw new Error('Player name is required.');
         }
         
-        const playerID = randomUUID();
-        const player:Player = {playerName:reqPlayerName, playerID:playerID};
-        const gameID = gameManagerInstance.createNewGame(player);
+        // const playerID = randomUUID();
+        // const player:Player = {playerName:reqPlayerName, playerID:playerID};
+        const playerCred = gameManagerInstance.createNewGame(reqPlayerName);
         
-        return res.json({ gameID:gameID, playerID:playerID });
+        return res.json({ gameID:playerCred?.gameID, playerID:playerCred?.playerID });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -47,12 +47,11 @@ export const joinGame = (req: Request, res: Response): any => {
             throw new Error('Player name is required.');
         }
         
-        const playerID = randomUUID();
-        const player:Player = {playerName:reqPlayerName, playerID:playerID};
-        gameManagerInstance.getGame(gameID).addPlayer(player);
+        // const player:Player = {playerName:reqPlayerName};
+        const playerCred = gameManagerInstance.getGame(gameID).addPlayer(reqPlayerName);
         
         
-        return res.json({ gameID:gameID, playerID:playerID });
+        return res.json({ gameID:gameID, playerID:playerCred.playerID });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

@@ -2,7 +2,7 @@
 
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { Game } from './class/game'; // Sua classe Game
-import { Player, Position, PieceType } from './models/types'; // Seus tipos
+import { Player, Position, PieceType, GameStatus, GameAndPlayerID } from './models/types'; // Seus tipos
 import { createInitialBoard } from './utils/boardSetup'; // Sua função de criação de tabuleiro
 
 // Definindo o tipo para a coleção de jogos
@@ -17,8 +17,7 @@ interface PossibleMovesResponse {
 export class GameManager {
     private io: SocketIOServer;
     private games: ActiveGames = {}; // Armazena instâncias de Game por gameId
-    // Map para rapidamente encontrar o gameId de um socket
-    // private socketToGameMap: Map<string, string> = new Map();
+    // Map para armazenar timers de reconexão
     private reconnectionTimers: Map<string, { timer: NodeJS.Timeout, disconnectedPlayerID: string }> = new Map();
 
     constructor(io: SocketIOServer) {
@@ -27,13 +26,14 @@ export class GameManager {
 
     // --- Métodos de Gerenciamento de Jogos (chamados principalmente pelo Express, ou internamente) ---
 
-    public createNewGame(player:Player): string | undefined {
-        if(!player.playerID)
+    public createNewGame(playerName:string): GameAndPlayerID | undefined {
+        if(!playerName)
             return;
         const gameId = Math.random().toString(36).substr(2, 4);
         const game = new Game(createInitialBoard());
+        let player;
         try {
-            game.addPlayer(player);
+            player = game.addPlayer(playerName);
         } catch (error) {
             throw error;
         }
@@ -41,7 +41,10 @@ export class GameManager {
         this.games[gameId] = game;
         
         console.log(`Game created: ${gameId}`);
-        return gameId;
+        if(player.playerID)
+            return {gameID:gameId, playerID:player.playerID};
+        else
+            return;
     }
 
     public getGame(gameId: string): Game{
@@ -84,8 +87,9 @@ export class GameManager {
     // private handlePlayerJoin(socket: Socket, gameId: string, playerName: string): void {
     private handlePlayerJoin(socket: Socket): void {
         const playerID = socket.playerID;
-        const game = this.getGame(socket.gameID);
         const gameId = socket.gameID;
+        const game = this.getGame(socket.gameID);
+        
         if(!playerID){
             socket.emit('joinError', {message:"playerID don't exists null or undefined"})
             return;
@@ -96,42 +100,47 @@ export class GameManager {
             return;
         }
         
-
-        // Tenta encontrar o jogador existente (para reconexão) ou adiciona um novo
         let player = game.getPlayerByID(socket.playerID);
-        // if (!player) {
-        //  if (game.getPlayers().length >= 2) {
-        //     socket.emit('joinError', { message: 'Game is full' });
-        //     return;
-        // } 
-        //     // Se o jogador não existe pelo nome, cria um novo
-        //     const color: 'white' | 'black' = game.getPlayers().length === 0 ? 'white' : 'black';
-        //     // player = { name: playerName, playerID:socket.playerID, color: color };
-        //     const playerName = this.games[socket.gameID].getPlayerByID(socket.playerID);
 
-        // } else {
-        //     // Se o jogador já existe, atualiza o socketId (caso de reconexão)
-        //     // player.socketId = socket.id;
-        //     console.log('Jogador já existe')
-        // }
-        // player = { name:player?.name , playerID:socket.playerID, color: color };
-        // game.addPlayer(player); // Adiciona o novo player à instância do Game
+        if (!player) {
+            socket.emit('joinError', { message: 'Player not found for this game.' });
+            return;
+        }
         
-        socket.join(socket.gameID);
-        // socket.data.gameId = gameId; // Opcional, mas útil para acesso rápido
-        // Envia estado inicial para o jogador que acabou de entrar
-        socket.emit('joinedGame', {
-            // gameId: gameId,
-            board: game.serializeBoard(),
-            color: player?.color,
-            turn: game.getTurn(),
-            status: game.getStatus()
-        });
-        // Notifica todos na sala sobre a atualização dos jogadores
-        // this.io.to(socket.gameID).emit('playersUpdate', { player: player?.playerName});
-        if (game.getPlayers().length === 2 && game.getStatus() === 'waiting') {
-            game.setStatus('playing'); // Inicia o jogo se 2 jogadores
-            this.io.to(socket.gameID).emit('gameStarted');
+        // Lógica de reconexão
+        if (!player.isOnline) {
+            console.log(`Player ${player.playerName} (${playerID}) is reconnecting to game ${gameId}.`);
+            game.setPlayerOnlineStatus(playerID, true); // Marca como online
+
+            const timerInfo = this.reconnectionTimers.get(gameId);
+            if (timerInfo && timerInfo.disconnectedPlayerID === playerID) {
+                clearTimeout(timerInfo.timer);
+                this.reconnectionTimers.delete(gameId);
+                console.log(`Reconnection timer cleared for player ${playerID} in game ${gameId}.`);
+            }
+            
+            if (game.getActivePlayersCount() === 2 && game.getStatus() === 'paused_reconnect') {
+                game.setStatus('playing');
+            }
+            
+            socket.join(gameId);
+            socket.emit('boardUpdate', {
+                board: game.serializeBoard(),
+                color: player.color,
+                turn: game.getTurn(),
+                status: game.getStatus()
+            });
+            this.io.to(gameId).emit('playerReconnected', { playerID, playerName: player.playerName, status: game.getStatus() });
+        } else {
+            // Lógica de join normal (jogador já estava online ou é o primeiro join do socket)
+            socket.join(gameId);
+            socket.emit('joinedGame', {
+                board: game.serializeBoard(),
+                color: player.color,
+                turn: game.getTurn(),
+                status: game.getStatus()
+            });
+            game.setStatus('playing');
         }
         console.log(`Player ${player?.playerName} (${socket.playerID}) joined game ${socket.gameID}`);
     }
@@ -207,31 +216,63 @@ export class GameManager {
 
     private async handlePlayerDisconnect(socket: Socket): Promise<void> {
         const gameId = socket.gameID;
-        const playerName = this.getGame(gameId).getPlayerByID(socket.playerID);
+        const playerID = socket.playerID;
+
         if (!gameId) {
-            console.log(`Socket ${socket.id} disconnected, not in an active game.`);
+            console.log(`Socket ${socket.id} (PlayerID: ${playerID}) disconnected, not in an active game.`);
             return;
         }
 
         const game = this.getGame(gameId);
+        let disconnectedPlayerName = "Unknown";
+
         if (game) {
-            // const disconnectedPlayer = game.removePlayerByplayerID(socket.id); // Marca o player como desconectado
-            // this.socketToGameMap.delete(socket.id); // Remove do mapa de sockets
-            this.io.to(gameId).emit('playersUpdate', { players: game.getPlayers() }); // Notifica a sala
-            
-            // Lógica para lidar com o jogo quando um jogador desconecta
-            // Se o jogo estava 'playing' e agora só tem 1 jogador ativo, o status pode mudar para 'paused' ou 'abandoned'
-            const sockets = await this.io.in(gameId).fetchSockets();
-            if (game.getStatus() === 'playing' && sockets.length < 2) {
-                game.setStatus('waiting'); // ou 'abandoned'
-                this.io.to(gameId).emit('gamePaused', { message: `Jogador ${playerName || 'unknown'} disconnected. Game paused.` });
-                // Aqui você pode decidir se o jogo deve ser encerrado, se o outro jogador ganha, etc.
-                // Ex: Se o outro jogador ganha automaticamente:
-                // const winnerColor = disconnectedPlayer?.color === 'white' ? 'black' : 'white';
-                // this.io.to(gameId).emit('gameOver', { winner: winnerColor, status: 'abandoned' });
-                // this.deleteGame(gameId);
+            const player = game.setPlayerOnlineStatus(playerID, false); // Marca o jogador como offline
+            if (player) {
+                disconnectedPlayerName = player.playerName;
+                this.io.to(gameId).emit('playersUpdate', { 
+                    playerID, 
+                    playerName: player.playerName,
+                    message: `${player.playerName} has disconnected.`
+                });
+                    console.log(game.getStatus())
+
+                if (game.getStatus() === 'playing' && game.getActivePlayersCount() < 2) {
+                    game.setStatus('paused_reconnect');
+                    const RECONNECTION_TIMEOUT_MS = 30000; // 2 minutos
+
+                    this.io.to(gameId).emit('gamePausedForReconnect', {
+                        disconnectedPlayerID: playerID,
+                        gameStatus: game.getStatus(),
+                        timeLeft: RECONNECTION_TIMEOUT_MS // envia em segundos
+                    });
+
+                    const timer = setTimeout(() => {
+                        const currentGame = this.getGame(gameId);
+                        const timerInfo = this.reconnectionTimers.get(gameId);
+
+                        if (currentGame && timerInfo && timerInfo.disconnectedPlayerID === playerID && currentGame.getStatus() === 'paused_reconnect') {
+                            const stillDisconnectedPlayer = currentGame.getPlayerByID(playerID);
+                            if (stillDisconnectedPlayer && !stillDisconnectedPlayer.isOnline) {
+                                const winner = currentGame.getPlayers().find(p => p.isOnline && p.playerID !== playerID);
+                                if (winner) {
+                                    currentGame.setStatus('ended');
+                                    this.io.to(gameId).emit('gameOver', { winner: winner.color, status: 'abandoned', message: `${stillDisconnectedPlayer.playerName} failed to reconnect. ${winner.playerName} wins!` });
+                                } else {
+                                    currentGame.setStatus('abandoned');
+                                    this.io.to(gameId).emit('gameAbandoned', { message: 'Game abandoned due to unresolved disconnection.' });
+                                }
+                                this.deleteGame(gameId); // Opcional: deletar o jogo após abandono
+                            }
+                        }
+                        this.reconnectionTimers.delete(gameId);
+                    }, RECONNECTION_TIMEOUT_MS);
+
+                    this.reconnectionTimers.set(gameId, { timer, disconnectedPlayerID: playerID });
+                    console.log(`Reconnection timer started for player ${playerID} in game ${gameId}.`);
+                }
             }
         }
-        console.log(`Socket ${socket.id} disconnected from game ${gameId}`);
+        console.log(`Player ${disconnectedPlayerName} (${playerID}, socket ${socket.id}) disconnected from game ${gameId}.`);
     }
 }
