@@ -19,17 +19,17 @@ const app: express.Application = express();
 
 app.use(express.json());
 app.use(cors());
-app.use((req, res, next):any => { //independente da rota precisa de um userName
-  const playerName = req.body?.playerName;
-  
-  if(!playerName){
-    return res.status(400).json({"error":"Player name is required"});
-  }
-  next();
-})
+// app.use((req, res, next):any => { //independente da rota precisa de um userName
+//   const playerName = req.body?.playerName;
+//   if(!playerName){
+//     return res.status(400).json({"error":"Player name is required"});
+//   }
+//   next();
+// })
 app.use((req, res, next):any =>{ //middleware de joinGame precisa obrigatoriamente de gameID e nome(mid acima)
   if(req.method === 'POST' && req.path === '/joinGame'){
     const gameID = req.body?.gameID;
+
     if(!gameID){
       return res.status(400).json({"error":"Game ID is required to join in game"});
     }
@@ -52,10 +52,11 @@ io.use((socket, next) => {
   socket.gameID = gameID;
   if(!socket.playerID || !socket.gameID)
     return;
-  
-  next();
+    next();
 })
-
+io.use((socket,next) => {
+  socket.
+})
 
 
 gameController.setGameManager(gameManager);

@@ -64,13 +64,12 @@ export class Game {
             return rescuePlayer;
         }
         const genID = randomUUID();
-        const color: 'white' | 'black' = this.getPlayers().length === 0 ? 'white' : 'black';
+        const color:PieceColor = this.getPlayers().length === 0 ? 'white' : 'black';
 
         const player:Player = {playerID:genID, playerName:playerName};
         player.color = color;
         player.isOnline = true; // Jogador está online ao ser adicionado
         this.players.push(player);
-        console.log(this.players);
         return player; // Retorna true se adicionado com sucesso 
     }
 

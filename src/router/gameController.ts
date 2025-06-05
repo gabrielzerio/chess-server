@@ -14,22 +14,22 @@ export const setGameManager = (manager: GameManager) => {
     gameManagerInstance = manager;
 };
 
-export const createGame = (req: Request, res: Response):any => {
+export const createGame = (req: Request, res: Response): any => {
     const reqPlayerName = req.body.playerName;
-        
+
     try {
         if (!gameManagerInstance) {
             throw new Error('GameManager not initialized.');
         }
-        if(!reqPlayerName){
+        if (!reqPlayerName) {
             throw new Error('Player name is required.');
         }
-        
+
         // const playerID = randomUUID();
         // const player:Player = {playerName:reqPlayerName, playerID:playerID};
         const playerCred = gameManagerInstance.createNewGame(reqPlayerName);
-        
-        return res.json({ gameID:playerCred?.gameID, playerID:playerCred?.playerID });
+
+        return res.json({ gameID: playerCred?.gameID, playerID: playerCred?.playerID });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -39,23 +39,47 @@ export const joinGame = (req: Request, res: Response): any => {
     const reqPlayerName = req.body.playerName;
     const gameID = req.body.gameID;
 
-        try {
+    try {
         if (!gameManagerInstance) {
             throw new Error('GameManager not initialized.');
         }
-        if(!reqPlayerName){
+        if (!reqPlayerName) {
             throw new Error('Player name is required.');
         }
-        
+       
         // const player:Player = {playerName:reqPlayerName};
         const playerCred = gameManagerInstance.getGame(gameID).addPlayer(reqPlayerName);
-        
-        
-        return res.json({ gameID:gameID, playerID:playerCred.playerID });
+
+
+        return res.json({ gameID: gameID, playerID: playerCred.playerID });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 };
+
+export const gameExists = (req: Request, res: Response): any => {
+    const gameID = req.body.gameID;
+    const playerID = req.body.playerID;
+
+    try{
+      if (!gameManagerInstance) {
+            throw new Error('GameManager not initialized.');
+        }
+        if(!playerID){
+           throw new Error('Player ID is required.'); 
+        }  
+        if(!gameID){
+           throw new Error('Game ID is required.');  
+        }   
+        const vrfGameID = gameManagerInstance.getGame(gameID);
+        if(vrfGameID && vrfGameID.getPlayerByID(playerID)){
+            res.status(200).json({status: "ok"});
+        }
+    }catch(error:any){
+        res.status(500).json({ error: error.message });
+    }
+}
+
 
 // joinGame, validGame e getMoves seriam REMOVIDOS daqui e migrados para o Socket.IO no GameManager.
 

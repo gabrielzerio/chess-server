@@ -26,8 +26,8 @@ export class GameManager {
 
     // --- Métodos de Gerenciamento de Jogos (chamados principalmente pelo Express, ou internamente) ---
 
-    public createNewGame(playerName:string): GameAndPlayerID | undefined {
-        if(!playerName)
+    public createNewGame(playerName: string): GameAndPlayerID | undefined {
+        if (!playerName)
             return;
         const gameId = Math.random().toString(36).substr(2, 4);
         const game = new Game(createInitialBoard());
@@ -37,17 +37,17 @@ export class GameManager {
         } catch (error) {
             throw error;
         }
-        
+
         this.games[gameId] = game;
-        
+
         console.log(`Game created: ${gameId}`);
-        if(player.playerID)
-            return {gameID:gameId, playerID:player.playerID};
+        if (player.playerID)
+            return { gameID: gameId, playerID: player.playerID };
         else
             return;
     }
 
-    public getGame(gameId: string): Game{
+    public getGame(gameId: string): Game {
         return this.games[gameId];
     }
 
@@ -67,13 +67,8 @@ export class GameManager {
     // metodo é chamado uma vez quando um novo socket se conecta
     public handleSocketConnection(socket: Socket): void {
         console.log(`Socket connected: ${socket.playerID}`);
-        // socket.on('requestGameAndplayerID', (callback:(res:GameAndplayerID) => void) => this.requestGameInfos(socket, callback));
-        // O 'this' deve se referir à instância do GameManager
-        // socket.on('joinGame', (data: { gameId: string; playerName: string }) => this.handlePlayerJoin(socket, data.gameId, data.playerName));
-        // socket.emit('session', {gameID:socket.gameID, playerID:socket.playerID});
         socket.on('joinGame', () => this.handlePlayerJoin(socket));
-        socket.on('requestPossibleMoves', (data: { from: Position}, callback:(res:PossibleMovesResponse) => void) => this.handleRequestPossibleMoves(socket, data.from, callback));
-        // socket.on('requestPossibleMoves', (data: { from: Position }) => this.handleRequestPossibleMoves(socket, data.from));
+        socket.on('requestPossibleMoves', (data: { from: Position }, callback: (res: PossibleMovesResponse) => void) => this.handleRequestPossibleMoves(socket, data.from, callback));
         socket.on('makeMove', (data: { from: Position; to: Position; promotionType?: PieceType }) => this.handleMakeMove(socket, data.from, data.to, data.promotionType));
         socket.on('disconnect', () => this.handlePlayerDisconnect(socket));
 
@@ -89,25 +84,23 @@ export class GameManager {
         const playerID = socket.playerID;
         const gameId = socket.gameID;
         const game = this.getGame(socket.gameID);
-        
-        if(!playerID){
-            socket.emit('joinError', {message:"playerID don't exists null or undefined"})
+        if (!playerID) {
+            socket.emit('joinError', { message: "playerID don't exists null or undefined" })
             return;
         }
-        
+
         if (!game) {
             socket.emit('joinError', { message: 'Game not found' });
             return;
         }
-        
+
         let player = game.getPlayerByID(socket.playerID);
 
         if (!player) {
             socket.emit('joinError', { message: 'Player not found for this game.' });
             return;
         }
-        
-        // Lógica de reconexão
+
         if (!player.isOnline) {
             console.log(`Player ${player.playerName} (${playerID}) is reconnecting to game ${gameId}.`);
             game.setPlayerOnlineStatus(playerID, true); // Marca como online
@@ -118,11 +111,11 @@ export class GameManager {
                 this.reconnectionTimers.delete(gameId);
                 console.log(`Reconnection timer cleared for player ${playerID} in game ${gameId}.`);
             }
-            
-            if (game.getActivePlayersCount() === 2 && game.getStatus() === 'paused_reconnect') {
+
+            if (game.getActivePlayersCount() === 2 && game.getStatus() !== 'playing') {
                 game.setStatus('playing');
             }
-            
+
             socket.join(gameId);
             socket.emit('boardUpdate', {
                 board: game.serializeBoard(),
@@ -131,6 +124,9 @@ export class GameManager {
                 status: game.getStatus()
             });
             this.io.to(gameId).emit('playerReconnected', { playerID, playerName: player.playerName, status: game.getStatus() });
+            this.io.to(socket.id).emit('joinedGame', {
+                board: game.serializeBoard(), color: player.color, turn: game.getTurn(), status: game.getStatus()
+            });
         } else {
             // Lógica de join normal (jogador já estava online ou é o primeiro join do socket)
             socket.join(gameId);
@@ -140,13 +136,29 @@ export class GameManager {
                 turn: game.getTurn(),
                 status: game.getStatus()
             });
-            game.setStatus('playing');
+            if (game.getActivePlayersCount() === 2) {
+                game.setStatus('playing')
+
+                // Lógica para iniciar o jogo se ambos os jogadores estiverem online e o jogo estiver esperando
+                if (game.getStatus() === 'waiting' && game.getActivePlayersCount() === 2) {
+                    game.setStatus('playing');
+                    this.io.to(gameId).emit('gameUpdate', {
+                        board: game.serializeBoard(),
+                        turn: game.getTurn(),
+                        status: game.getStatus(), // Agora 'playing'
+                        message: 'Game started! Both players are connected.'
+                    });
+                } else if (game.getStatus() === 'waiting') {
+                    // Ainda esperando o segundo jogador
+                    this.io.to(gameId).emit('gameUpdate', { status: game.getStatus(), players: game.getPlayers().map(p => ({ playerName: p.playerName, isOnline: p.isOnline })), message: 'Waiting for opponent to connect.' });
+                }
+            }
         }
         console.log(`Player ${player?.playerName} (${socket.playerID}) joined game ${socket.gameID}`);
     }
 
-    private handleRequestPossibleMoves(socket: Socket, from: Position, callback: (res:PossibleMovesResponse) => void): void {
-        // private handleRequestPossibleMoves(socket: Socket, from: Position): void {
+    private handleRequestPossibleMoves(socket: Socket, from: Position, callback: (res: PossibleMovesResponse) => void): void {
+
         const gameId = socket.gameID;
         if (!gameId) {
             socket.emit('error', { message: 'Not in a game to request moves.' });
@@ -169,33 +181,24 @@ export class GameManager {
             return;
         }
         const { normalMoves, captureMoves } = game.possibleMoves(piece);
-        callback({normalMoves, captureMoves}); //aqui vou colocar todos os dados que quero devolver para a 'requisição
+        callback({ normalMoves, captureMoves }); //aqui vou colocar todos os dados que quero devolver para a 'requisição
         // socket.emit('possibleMovesResponse', { normalMoves, captureMoves }); 
         console.log(`Possible moves requested by ${socket.playerID} for game ${socket.gameID}`);
     }
 
     private async handleMakeMove(socket: Socket, from: Position, to: Position, promotionType?: PieceType): Promise<void> {
-        // const gameId = this.socketToGameMap.get(socket.id);
-        const gameId = this.games[socket.gameID].getPlayerByID(socket.playerID);
-
-        if (!gameId) {
-            socket.emit('moveError', { message: 'Not in a game to make a move.' });
-            return;
-        }
+        console.log(this.getGame(socket.gameID).getStatus())
         const game = this.getGame(socket.gameID);
         if (!game) {
             socket.emit('moveError', { message: 'Associated game not found.' });
             return;
         }
-        if (game.getStatus() !== 'playing') {
-            socket.emit('moveError', { message: 'Game is not in playing state.' });
+        if (game.getStatus() !== "playing") {
             return;
         }
-        game.setStatus('playing')
-
         const piece = game.getSelectedPiece(from);
-        if(!piece) return;
-        
+        if (!piece) return;
+
         const moveResult = await game.applyMove(socket.playerID, from, to, promotionType);
         // console.log(moveResult.message);
         if (moveResult.success) {
@@ -206,8 +209,8 @@ export class GameManager {
                 // this.deleteGame(gameId); // Descomentar se quiser remover automaticamente
             } else if (moveResult.status === 'checkmate') {
                 // Caso específico de xeque-mate sem winner direto no retorno, trate aqui
-                 this.io.to(socket.gameID).emit('gameOver', { winner: game.getTurn() === 'white' ? 'black' : 'white', status: moveResult.status });
-                 // this.deleteGame(gameId);
+                this.io.to(socket.gameID).emit('gameOver', { winner: game.getTurn() === 'white' ? 'black' : 'white', status: moveResult.status });
+                // this.deleteGame(gameId);
             }
         } else {
             socket.emit('moveError', { message: 'Invalid move.' });
@@ -217,7 +220,7 @@ export class GameManager {
     private async handlePlayerDisconnect(socket: Socket): Promise<void> {
         const gameId = socket.gameID;
         const playerID = socket.playerID;
-
+        const playerName = this.getGame(gameId).getPlayerByID(playerID)?.playerName;
         if (!gameId) {
             console.log(`Socket ${socket.id} (PlayerID: ${playerID}) disconnected, not in an active game.`);
             return;
@@ -230,19 +233,18 @@ export class GameManager {
             const player = game.setPlayerOnlineStatus(playerID, false); // Marca o jogador como offline
             if (player) {
                 disconnectedPlayerName = player.playerName;
-                this.io.to(gameId).emit('playersUpdate', { 
-                    playerID, 
-                    playerName: player.playerName,
-                    message: `${player.playerName} has disconnected.`
-                });
-                    console.log(game.getStatus())
+                // this.io.to(gameId).emit('playersUpdate', {
+                //     playerID,
+                //     playerName: player.playerName,
+                //     message: `${player.playerName} has disconnected.`
+                // });
 
                 if (game.getStatus() === 'playing' && game.getActivePlayersCount() < 2) {
                     game.setStatus('paused_reconnect');
                     const RECONNECTION_TIMEOUT_MS = 30000; // 2 minutos
 
                     this.io.to(gameId).emit('gamePausedForReconnect', {
-                        disconnectedPlayerID: playerID,
+                        disconnectedPlayerName: playerName,
                         gameStatus: game.getStatus(),
                         timeLeft: RECONNECTION_TIMEOUT_MS // envia em segundos
                     });
