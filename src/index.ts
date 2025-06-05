@@ -54,9 +54,6 @@ io.use((socket, next) => {
     return;
     next();
 })
-io.use((socket,next) => {
-  socket.
-})
 
 
 gameController.setGameManager(gameManager);
