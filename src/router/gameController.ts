@@ -48,10 +48,15 @@ export const joinGame = (req: Request, res: Response): any => {
         }
        
         // const player:Player = {playerName:reqPlayerName};
-        const playerCred = gameManagerInstance.getGame(gameID).addPlayer(reqPlayerName);
+        const game = gameManagerInstance.getGame(gameID);
+        if(game){
+            const playerCred = game.addPlayer(reqPlayerName);
+            return res.json({ gameID: gameID, playerID: playerCred.playerID });
+        }
+        else{
+            throw new Error("O jogo não existe");
+        }
 
-
-        return res.json({ gameID: gameID, playerID: playerCred.playerID });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

@@ -1,11 +1,10 @@
-import express, {Request, Response} from 'express';
+import express from 'express';
 import cors from 'cors';
 import http from 'http';
 import {Server} from 'socket.io';
 import gameRoutes from './router/gameRoutes';
 import { GameManager } from './gameManager';
 import * as gameController from './router/gameController'
-import { randomUUID } from 'crypto';
 
 // Extend Socket type to include username property
 declare module 'socket.io' {
@@ -16,9 +15,13 @@ declare module 'socket.io' {
 }
 
 const app: express.Application = express();
-
+const corsOptions = {
+  origin:'https://chess-front-eight.vercel.app',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  allowedHeaders: 'Content-Type,Authorization' 
+}
 app.use(express.json());
-app.use(cors());
+app.use(cors(corsOptions));
 // app.use((req, res, next):any => { //independente da rota precisa de um userName
 //   const playerName = req.body?.playerName;
 //   if(!playerName){
