@@ -1,72 +1,103 @@
+// gameController.ts
+
 import { Request, Response } from 'express';
-import { games } from '../gameStore';
-import { createInitialBoard } from '../utils/boardSetup';
-import { Game } from '../class/game';
+import { GameManager } from '../gameManager'; // Importe seu GameManager
+import { randomUUID } from 'crypto';
 import { Player } from '../models/types';
 
-export const createGame = (req: Request, res: Response) => {
-    const gameId = Math.random().toString(36).substr(2, 4);
-  games[gameId] = new Game(createInitialBoard());
-  console.log(`Game created: ${gameId}`);
-  res.json({ gameId });
+// Assumindo que você terá uma instância global ou injetada do GameManager
+// Para simplicidade, vamos exportar uma função que aceita o gameManager
+// Ou, se você inicializar o GameManager em seu main server.ts, pode passá-lo para suas rotas
+let gameManagerInstance: GameManager;
+
+export const setGameManager = (manager: GameManager) => {
+    gameManagerInstance = manager;
 };
 
-export const joinGame = (req: Request<{ gameId: string }, any, { playerName: string }>, res: Response): any=> {
-  const  gameId  = req.params.gameId;
-  const  playerName  = req.body.playerName;
-  if (!games[gameId]) return res.status(404).json({ error: 'Game not found' });
-  if (games[gameId].players.length >= 2) return res.status(400).json({ error: 'Game full' });
-  // Atribui cor automaticamente
-  const color = games[gameId].players.length === 0 ? 'white' : 'black';
-  // games[gameId].players.push({ name: playerName, color, socketId: null }); //utilizar metodo do game.ts
-  const player:Player = {name:playerName, color:color, socketId:null};
-  games[gameId].addPlayer(player) 
-  if (games[gameId].players.length === 2) games[gameId].status = 'playing';
-  return res.json({ success: true, color });
+export const createGame = (req: Request, res: Response): any => {
+    const reqPlayerName = req.body.playerName;
+
+    try {
+        if (!gameManagerInstance) {
+            throw new Error('GameManager not initialized.');
+        }
+        if (!reqPlayerName) {
+            throw new Error('Player name is required.');
+        }
+
+        // const playerID = randomUUID();
+        // const player:Player = {playerName:reqPlayerName, playerID:playerID};
+        const playerCred = gameManagerInstance.createNewGame(reqPlayerName);
+
+        return res.json({ gameID: playerCred?.gameID, playerID: playerCred?.playerID });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 };
 
-export const validGame = (req: Request, res: Response):any => {
-  const { gameId } = req.body;
-   const { playerName } = req.body;
-   if (!games[gameId]) return res.status(404).json({ error: 'Game not found' });
-   if (!games[gameId].players.find((p:Player) => p.name === playerName)) {
-     return res.status(403).json({ error: 'Player not in game' });
-   }
-   res.json( {valid:true} );
+export const joinGame = (req: Request, res: Response): any => {
+    const reqPlayerName = req.body.playerName;
+    const gameID = req.body.gameID;
+
+    try {
+        if (!gameManagerInstance) {
+            throw new Error('GameManager not initialized.');
+        }
+        if (!reqPlayerName) {
+            throw new Error('Player name is required.');
+        }
+       
+        // const player:Player = {playerName:reqPlayerName};
+        const playerCred = gameManagerInstance.getGame(gameID).addPlayer(reqPlayerName);
+
+
+        return res.json({ gameID: gameID, playerID: playerCred.playerID });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 };
 
-export const getMoves = async (req: Request, res: Response):Promise<any> => {
-  const { gameId } = req.params;
-    const { from, playerName } = req.body; // { row, col }, playerName opcional
-    const game = games[gameId];
-    if (!game || !game.board) return res.status(404).json({ error: 'Game not found' });
-  
-    // Reconstrua o board se necessário
-    if (!game.board[0][0]?.move) {
-      game.deserializeBoard();
+export const gameExists = (req: Request, res: Response): any => {
+    const gameID = req.body.gameID;
+    const playerID = req.body.playerID;
+
+    try{
+      if (!gameManagerInstance) {
+            throw new Error('GameManager not initialized.');
+        }
+        if(!playerID){
+           throw new Error('Player ID is required.'); 
+        }  
+        if(!gameID){
+           throw new Error('Game ID is required.');  
+        }   
+        const vrfGameID = gameManagerInstance.getGame(gameID);
+        if(vrfGameID && vrfGameID.getPlayerByID(playerID)){
+            res.status(200).json({status: "ok"});
+        }
+    }catch(error:any){
+        res.status(500).json({ error: error.message });
     }
-    const piece = game.getSelectedPiece(from); 
-    if (!piece) return res.json({ moves: [] });
-  
-    // Só permite mostrar movimentos da peça do jogador da vez
-    if (piece.color !== game.turn) {
-      return res.json({ moves: [] });
-    }
-    // Se playerName for enviado, valida se é o jogador correto
-    if (playerName) {
-      const player = game.checkPlayerName(playerName);
-      if (!player || player.color !== game.turn) {
-        return res.json({ moves: [] });
-      }
-    }
-  
-    const { normalMoves, captureMoves } = game.possibleMoves(piece);
-    res.json({ normalMoves, captureMoves });
-};
+}
+
+
+// joinGame, validGame e getMoves seriam REMOVIDOS daqui e migrados para o Socket.IO no GameManager.
 
 export const deleteGame = (req: Request, res: Response): any => {
-  const { gameId } = req.params;
-  if (!games[gameId]) return res.status(404).json({ error: 'Game not found' });
-  delete games[gameId];
-  console.log(`Game deleted: ${gameId}`);
+    try {
+        if (!gameManagerInstance) {
+            throw new Error('GameManager not initialized.');
+        }
+        const { gameId } = req.params;
+        const deleted = gameManagerInstance.deleteGame(gameId);
+        if (!deleted) {
+            return res.status(404).json({ error: 'Game not found' });
+        }
+        res.json({ success: true, message: `Game ${gameId} deleted.` });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 };
+
+// Opcional: Se você quiser um endpoint REST para listar jogos, por exemplo
+// export const listGames = (req: Request, res: Response) => { ... }

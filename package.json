@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "chess-server1": "file:",
     "express": "^5.1.0"
   },
   "devDependencies": {
