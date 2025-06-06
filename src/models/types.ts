@@ -26,16 +26,6 @@ export interface GameAndPlayerID{
     playerID:string;
 }
 
-// export interface IAddPlayerResult {
-//   success: boolean;
-//   code?: ErrorCode // Códigos de erro específicos
-// }
-
-// export interface ICreateNewGameResult extends IAddPlayerResult {
-//   gameID?: string;
-// }
-
-
 export class GameError extends Error {
   constructor(message: string, public code: string, public statusCode: number = 400) {
     super(message);
@@ -60,6 +50,8 @@ export class PlayerAlreadyExistsError extends GameError {
 
 
 
+import { DecorateAcknowledgementsWithMultipleResponses, DefaultEventsMap } from 'socket.io/dist/typed-events';
 // Import da classe base Piece
 import { Piece } from '../class/piece';
+import { BroadcastOperator } from 'socket.io';
 export type Board = (Piece | null)[][];

@@ -52,7 +52,7 @@ export class Game {
 
     // --- Métodos de Gerenciamento de Jogadores ---
 
-    addPlayer(playerName:string): Player {
+    addPlayer(playerName: string): Player {
         if (this.getActivePlayersCount() >= 2) {
             throw new GameFullError(); // Lança exceção
         }
@@ -64,9 +64,9 @@ export class Game {
             return rescuePlayer;
         }
         const genID = randomUUID();
-        const color:PieceColor = this.getPlayers().length === 0 ? 'white' : 'black';
+        const color: PieceColor = this.getPlayers().length === 0 ? 'white' : 'black';
 
-        const player:Player = {playerID:genID, playerName:playerName};
+        const player: Player = { playerID: genID, playerName: playerName };
         player.color = color;
         player.isOnline = true; // Jogador está online ao ser adicionado
         this.players.push(player);
@@ -74,12 +74,20 @@ export class Game {
     }
 
     // NOVO: Retorna o jogador pelo socketId ou undefined
-    public getPlayerByID(playerID: string): Player | undefined {
-        return this.players.find(p => p.playerID === playerID);
+    public getPlayerByID(playerID: string): Player | null{
+        try {
+            const player = this.players.find(p => p.playerID === playerID);
+            if (player) {
+                return player;
+            }
+        } catch (error) {
+            console.error(error);
+        }
+        return null;
     }
 
     // Refatorado: Retorna o jogador pelo nome ou undefined, sem lançar erro
-    public getPlayerByName(playerName: string): Player | undefined {
+    public getPlayerByName(playerName: string): Player | void {
         return this.players.find(p => p.playerName === playerName);
     }
 
