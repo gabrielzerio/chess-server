@@ -5,6 +5,7 @@ import {Server} from 'socket.io';
 import gameRoutes from './router/gameRoutes';
 import { GameManager } from './gameManager';
 import * as gameController from './router/gameController'
+import { Request, Response } from 'express';
 
 // Extend Socket type to include username property
 declare module 'socket.io' {
@@ -15,6 +16,15 @@ declare module 'socket.io' {
 }
 
 const app: express.Application = express();
+
+app.get('/', (req: Request, res: Response) => {
+  // Retorna um status 200 (OK) e uma mensagem JSON
+  res.status(200).json({ 
+    status: 'ok', 
+    message: 'API is running and healthy!' 
+  });
+});
+
 const corsOptions = {
   origin:'https://chess-front-eight.vercel.app',
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',

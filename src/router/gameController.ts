@@ -2,8 +2,6 @@
 
 import { Request, Response } from 'express';
 import { GameManager } from '../gameManager'; // Importe seu GameManager
-import { randomUUID } from 'crypto';
-import { Player } from '../models/types';
 
 // Assumindo que você terá uma instância global ou injetada do GameManager
 // Para simplicidade, vamos exportar uma função que aceita o gameManager
