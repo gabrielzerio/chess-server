@@ -38,22 +38,22 @@ export const createGame = (req: Request, res: Response): any => {
 export const joinGame = (req: Request, res: Response): any => {
     const reqPlayerName = req.body.playerName;
     const gameID = req.body.gameID;
-
+    if (!gameManagerInstance) {
+        throw new Error('GameManager not initialized.');
+    }
+    if (!reqPlayerName) {
+        throw new Error('Player name is required.');
+    }
     try {
-        if (!gameManagerInstance) {
-            throw new Error('GameManager not initialized.');
-        }
-        if (!reqPlayerName) {
-            throw new Error('Player name is required.');
-        }
-       
+
+
         // const player:Player = {playerName:reqPlayerName};
         const game = gameManagerInstance.getGame(gameID);
-        if(game){
+        if (game) {
             const playerCred = game.addPlayer(reqPlayerName);
             return res.json({ gameID: gameID, playerID: playerCred.playerID });
         }
-        else{
+        else {
             throw new Error("O jogo não existe");
         }
 
@@ -66,21 +66,21 @@ export const gameExists = (req: Request, res: Response): any => {
     const gameID = req.body.gameID;
     const playerID = req.body.playerID;
 
-    try{
-      if (!gameManagerInstance) {
+    try {
+        if (!gameManagerInstance) {
             throw new Error('GameManager not initialized.');
         }
-        if(!playerID){
-           throw new Error('Player ID is required.'); 
-        }  
-        if(!gameID){
-           throw new Error('Game ID is required.');  
-        }   
-        const vrfGameID = gameManagerInstance.getGame(gameID);
-        if(vrfGameID && vrfGameID.getPlayerByID(playerID)){
-            res.status(200).json({status: "ok"});
+        if (!playerID) {
+            throw new Error('Player ID is required.');
         }
-    }catch(error:any){
+        if (!gameID) {
+            throw new Error('Game ID is required.');
+        }
+        const vrfGameID = gameManagerInstance.getGame(gameID);
+        if (vrfGameID && vrfGameID.getPlayerByID(playerID)) {
+            res.status(200).json({ status: "ok" });
+        }
+    } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 }
