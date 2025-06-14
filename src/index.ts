@@ -1,5 +1,5 @@
 import express from 'express';
-import cors from 'cors';
+import cors, { CorsOptions } from 'cors';
 import http from 'http';
 import {Server} from 'socket.io';
 import gameRoutes from './router/gameRoutes';
@@ -25,11 +25,24 @@ app.get('/', (req: Request, res: Response) => {
   });
 });
 
-const corsOptions = {
-  origin:'https://chess-front-eight.vercel.app',
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  allowedHeaders: 'Content-Type,Authorization' 
-}
+const allowedOrigins = [
+  'https://chess-front-eight.vercel.app',
+  'https://chess-front-git-develop-gabrielzerios-projects.vercel.app'
+];
+
+const corsOptions: CorsOptions = {
+  origin: (origin, callback) => {
+    // Permite requisições sem origin (Postman, curl, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
 app.use(express.json());
 app.use(cors(corsOptions));
 // app.use((req, res, next):any => { //independente da rota precisa de um userName
