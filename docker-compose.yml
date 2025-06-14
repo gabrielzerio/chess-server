@@ -1,8 +1,13 @@
 services:
   chess-server:
-    container_name: chess-server
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "3001:3001"
+    networks:
+      - nginx-net
+
+networks:
+  nginx-net:
+    external: true
