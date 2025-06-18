@@ -2,8 +2,6 @@
 
 import { Request, Response } from 'express';
 import { GameManager } from '../gameManager'; // Importe seu GameManager
-import { randomUUID } from 'crypto';
-import { Player } from '../models/types';
 
 // Assumindo que você terá uma instância global ou injetada do GameManager
 // Para simplicidade, vamos exportar uma função que aceita o gameManager
@@ -38,20 +36,25 @@ export const createGame = (req: Request, res: Response): any => {
 export const joinGame = (req: Request, res: Response): any => {
     const reqPlayerName = req.body.playerName;
     const gameID = req.body.gameID;
-
+    if (!gameManagerInstance) {
+        throw new Error('GameManager not initialized.');
+    }
+    if (!reqPlayerName) {
+        throw new Error('Player name is required.');
+    }
     try {
-        if (!gameManagerInstance) {
-            throw new Error('GameManager not initialized.');
-        }
-        if (!reqPlayerName) {
-            throw new Error('Player name is required.');
-        }
-       
+
+
         // const player:Player = {playerName:reqPlayerName};
-        const playerCred = gameManagerInstance.getGame(gameID).addPlayer(reqPlayerName);
+        const game = gameManagerInstance.getGame(gameID);
+        if (game) {
+            const playerCred = game.addPlayer(reqPlayerName);
+            return res.json({ gameID: gameID, playerID: playerCred.playerID });
+        }
+        else {
+            throw new Error("O jogo não existe");
+        }
 
-
-        return res.json({ gameID: gameID, playerID: playerCred.playerID });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -61,21 +64,21 @@ export const gameExists = (req: Request, res: Response): any => {
     const gameID = req.body.gameID;
     const playerID = req.body.playerID;
 
-    try{
-      if (!gameManagerInstance) {
+    try {
+        if (!gameManagerInstance) {
             throw new Error('GameManager not initialized.');
         }
-        if(!playerID){
-           throw new Error('Player ID is required.'); 
-        }  
-        if(!gameID){
-           throw new Error('Game ID is required.');  
-        }   
-        const vrfGameID = gameManagerInstance.getGame(gameID);
-        if(vrfGameID && vrfGameID.getPlayerByID(playerID)){
-            res.status(200).json({status: "ok"});
+        if (!playerID) {
+            throw new Error('Player ID is required.');
         }
-    }catch(error:any){
+        if (!gameID) {
+            throw new Error('Game ID is required.');
+        }
+        const vrfGameID = gameManagerInstance.getGame(gameID);
+        if (vrfGameID && vrfGameID.getPlayerByID(playerID)) {
+            res.status(200).json({ status: "ok" });
+        }
+    } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 }

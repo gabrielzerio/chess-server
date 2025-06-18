@@ -1,11 +1,14 @@
-import express, {Request, Response} from 'express';
-import cors from 'cors';
+import express from 'express';
+import cors, { CorsOptions } from 'cors';
 import http from 'http';
 import {Server} from 'socket.io';
-import gameRoutes from './router/gameRoutes';
+import gameRoutes from './router/privateGameRoutes';
+
 import { GameManager } from './gameManager';
 import * as gameController from './router/gameController'
-import { randomUUID } from 'crypto';
+
+import 'dotenv/config';
+import  {publicRouter, publicRoutersetInstance}  from './router/publicRoutes';
 
 // Extend Socket type to include username property
 declare module 'socket.io' {
@@ -17,8 +20,38 @@ declare module 'socket.io' {
 
 const app: express.Application = express();
 
+app.use(publicRouter);
+
+const allowedOrigins = [
+  'https://chess-front-eight.vercel.app',
+  'https://chess-front-git-develop-gabrielzerios-projects.vercel.app'
+];
+
+if(process.env.NODE_ENV === "development"){
+  allowedOrigins.push('http://localhost:5173');
+  allowedOrigins.push('http://127.0.0.1:5173');
+  allowedOrigins.push('https://localhost:5173'); 
+  allowedOrigins.push('https://127.0.0.1:5173');
+  // allowedOrigins.push('http://192.168.0.171:5173');
+  allowedOrigins.push('http://192.168.0.171:5173');
+}
+
+const corsOptions: CorsOptions = {
+  origin: (origin, callback) => {
+    // Permite requisições sem origin (Postman, curl, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials:true
+};
+
 app.use(express.json());
-app.use(cors());
+app.use(cors(corsOptions));
 // app.use((req, res, next):any => { //independente da rota precisa de um userName
 //   const playerName = req.body?.playerName;
 //   if(!playerName){
@@ -41,7 +74,7 @@ app.use(gameRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*' }
+  cors: corsOptions
 });
 
 const gameManager = new GameManager(io);
@@ -57,7 +90,7 @@ io.use((socket, next) => {
 
 
 gameController.setGameManager(gameManager);
-
+publicRoutersetInstance(gameManager)
  io.on('connection', (socket) => {
     gameManager.handleSocketConnection(socket); // Delega o socket para o GameManager
 });
