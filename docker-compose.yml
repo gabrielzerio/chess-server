@@ -7,8 +7,31 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3001:3001"
+    depends_on:
+      - mysql
     networks:
       - nginx-net
+    environment:
+      DATABASE_URL: "mysql://chessuser:chesspass@mysql:3306/chessdb"
+      
+  mysql:
+    image: mysql:8.0
+    container_name: chess-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: chessdb
+      MYSQL_USER: chessuser
+      MYSQL_PASSWORD: chesspass
+    ports:
+      - "3306:3306"
+    volumes:
+      - chess-mysql-data:/var/lib/mysql
+    networks:
+      - nginx-net
+
+volumes:
+  chess-mysql-data:
 
 networks:
   nginx-net:

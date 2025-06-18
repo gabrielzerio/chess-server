@@ -219,12 +219,12 @@ export class GameManager {
         if (moveResult.success) {
             this.io.to(socket.gameID).emit('boardUpdate', { board: moveResult.board, turn: moveResult.turn, status: moveResult.status });
             if (moveResult.winner) {
-                this.io.to(socket.gameID).emit('gameOver', { playerName: player?.playerName });
+                this.io.to(socket.gameID).emit('gameOver',  { winner: game.getTurn() === 'white' ? 'black' : 'white', status: moveResult.status, playerWinner:player?.playerName });
                 // Considera remover o jogo se ele acabou
                 // this.deleteGame(gameId); // Descomentar se quiser remover automaticamente
             } else if (moveResult.status === 'checkmate') {
                 // Caso específico de xeque-mate sem winner direto no retorno, trate aqui
-                this.io.to(socket.gameID).emit('gameOver', { winner: game.getTurn() === 'white' ? 'black' : 'white', status: moveResult.status });
+                this.io.to(socket.gameID).emit('gameOver', { winner: game.getTurn() === 'white' ? 'black' : 'white', message:"Cheque mate", status: moveResult.status, playerWinner:player?.playerName });
                 // this.deleteGame(gameId);
             }
         } else {
@@ -276,7 +276,7 @@ export class GameManager {
                             if (stillDisconnectedPlayer && !stillDisconnectedPlayer.isOnline) {
                                 if (playerWinner) {
                                     currentGame.setStatus('ended');
-                                    this.io.to(gameId).emit('gameOver', { status: 'abandoned', message: `${stillDisconnectedPlayer.playerName} failed to reconnect. ${playerWinner.playerName} wins!` });
+                                    this.io.to(gameId).emit('gameOver', { status: 'abandoned', playerWinner:player.playerName, message: `${stillDisconnectedPlayer.playerName} não se reconectou a tempo` });
                                 } else {
                                     currentGame.setStatus('abandoned');
                                     this.io.to(gameId).emit('gameAbandoned', { message: 'Game abandoned due to unresolved disconnection.' });
