@@ -1,5 +1,7 @@
 services:
   chess-server:
+    image: chess-api-image
+    container_name: chess-api
     build:
       context: .
       dockerfile: Dockerfile

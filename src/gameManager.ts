@@ -25,7 +25,9 @@ export class GameManager {
     }
 
     // --- Métodos de Gerenciamento de Jogos (chamados principalmente pelo Express, ou internamente) ---
-
+    public getAllGames():ActiveGames{
+        return this.games;
+    }
     public createNewGame(playerName: string): GameAndPlayerID | undefined {
         if (!playerName)
             return;
@@ -144,6 +146,7 @@ export class GameManager {
                 turn: game.getTurn(),
                 status: game.getStatus()
             });
+            socket.to(gameId).emit('roomJoinMessage', {playerName: player.playerName})
             if (game.getActivePlayersCount() === 2) {
                 game.setStatus('playing')
 
@@ -205,6 +208,7 @@ export class GameManager {
             return;
         }
         if (game.getStatus() !== "playing") {
+            socket.emit('moveError', { message: 'O jogador inimigo ainda não entrou' });
             return;
         }
         const piece = game.getSelectedPiece(from);
@@ -255,7 +259,7 @@ export class GameManager {
 
                 if (game.getStatus() === 'playing' && game.getActivePlayersCount() < 2) {
                     game.setStatus('paused_reconnect');
-                    const RECONNECTION_TIMEOUT_MS = 3000; // 1 minuto
+                    const RECONNECTION_TIMEOUT_MS = 60000; // 1 minuto
 
                     this.io.to(gameId).emit('gamePausedForReconnect', {
                         disconnectedPlayerName: playerWinner?.playerName,
@@ -285,6 +289,9 @@ export class GameManager {
 
                     this.reconnectionTimers.set(gameId, { timer, disconnectedPlayerID: playerID });
                     console.log(`Reconnection timer started for player ${playerID} in game ${gameId}.`);
+                }
+                if(game.getActivePlayersCount() < 1){
+                    this.deleteGame(gameId)
                 }
             }
         }
