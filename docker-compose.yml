@@ -1,38 +1,34 @@
 services:
   chess-server:
-    image: chess-api-image
+    image: gabrielzerio/chess-api:latest
     container_name: chess-api
-    build:
-      context: .
-      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: "mysql://chessuser:chesspass@mariadb:3306/chessdb"
+      NODE_ENV: development
     ports:
       - "3001:3001"
     depends_on:
-      - mysql
-    networks:
-      - nginx-net
-    environment:
-      DATABASE_URL: "mysql://chessuser:chesspass@mysql:3306/chessdb"
-      
-  mysql:
-    image: mysql:8.0
-    container_name: chess-mysql
+      mariadb:
+        condition: service_healthy
+
+  mariadb:
+    image: mariadb:11.4
+    container_name: chess-mariadb
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: chessdb
-      MYSQL_USER: chessuser
-      MYSQL_PASSWORD: chesspass
+      MARIADB_ROOT_PASSWORD: rootpassword
+      MARIADB_DATABASE: chessdb
+      MARIADB_USER: chessuser
+      MARIADB_PASSWORD: chesspass
     ports:
       - "3306:3306"
     volumes:
-      - chess-mysql-data:/var/lib/mysql
-    networks:
-      - nginx-net
+      - mariadb_data:/var/lib/mariadb
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 volumes:
-  chess-mysql-data:
-
-networks:
-  nginx-net:
-    external: true
+  mariadb_data:
