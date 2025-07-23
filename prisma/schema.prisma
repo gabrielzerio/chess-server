@@ -1,30 +1,35 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  // output pode ser personalizado se necessário
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "mysql" // ou o que você estiver usando
   url      = env("DATABASE_URL")
-
 }
 
 model Player {
-  id    Int     @id @default(autoincrement())
-  name  String
-  elo   Int
+  id     Int     @id @default(autoincrement())
+  name   String
+  elo    Int
+
+  whiteGames Game[] @relation("WhitePlayer")
+  blackGames Game[] @relation("BlackPlayer")
+  wins       Game[] @relation("Winner")
 }
 
 model Game {
-  id            Int       @id @default(autoincrement())
+  id            Int      @id @default(autoincrement())
+
+  playerWhite   Player   @relation("WhitePlayer", fields: [playerWhiteId], references: [id])
   playerWhiteId Int
-  playerBlackId Int
-  winner        String?
-  createdAt     DateTime  @default(now())
+
+  playerBlack   Player?  @relation("BlackPlayer", fields: [playerBlackId], references: [id])
+  playerBlackId Int?
+
+  winner        Player?  @relation("Winner", fields: [winnerId], references: [id])
+  winnerId      Int?
+
+  createdAt     DateTime @default(now())
+  endedAt       DateTime?
 }

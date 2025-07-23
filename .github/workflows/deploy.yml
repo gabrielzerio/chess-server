@@ -1,0 +1,33 @@
+name: "Deploy VPS OCI"
+on:
+  workflow_run:
+    workflows: ["Docker build"]
+    types:
+      - completed
+jobs:
+  build_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Clone docker-compose"
+        uses: actions/checkout@v4
+     
+      - name: Copy file via SSH-SCP
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.HOST }}
+          username: "ubuntu"
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.PORT }}
+          source: "./docker-compose.yml"
+          target: "$HOME/aplicacoes"
+          overwrite: true
+      - name: Execute remote SSH commands
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.HOST }}
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            cd $HOME/aplicacoes
+            docker compose up -d

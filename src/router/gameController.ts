@@ -2,17 +2,19 @@
 
 import { Request, Response } from 'express';
 import { GameManager } from '../gameManager'; // Importe seu GameManager
+import GameService from './services/gameService';
 
 // Assumindo que você terá uma instância global ou injetada do GameManager
 // Para simplicidade, vamos exportar uma função que aceita o gameManager
 // Ou, se você inicializar o GameManager em seu main server.ts, pode passá-lo para suas rotas
 let gameManagerInstance: GameManager;
+const gameService = new GameService();
 
 export const setGameManager = (manager: GameManager) => {
     gameManagerInstance = manager;
 };
 
-export const createGame = (req: Request, res: Response): any => {
+export const createGame = async (req: Request, res: Response): Promise<any> => {
     const reqPlayerName = req.body.playerName;
 
     try {
@@ -23,10 +25,11 @@ export const createGame = (req: Request, res: Response): any => {
             throw new Error('Player name is required.');
         }
 
-        // const playerID = randomUUID();
-        // const player:Player = {playerName:reqPlayerName, playerID:playerID};
-        const playerCred = gameManagerInstance.createNewGame(reqPlayerName);
 
+        const playerCred = gameManagerInstance.createNewGame(reqPlayerName);
+        
+        const whiteP = await gameService.createPlayer(reqPlayerName, 0);
+        await gameService.createGameWithPlayerWhite(whiteP.id);
         return res.json({ gameID: playerCred?.gameID, playerID: playerCred?.playerID });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
