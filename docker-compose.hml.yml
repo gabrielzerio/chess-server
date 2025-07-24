@@ -1,41 +1,5 @@
 services:
   chess-server:
-    container_name: ${NOME_CONTAINER}
     build:
       context: .
       dockerfile: Dockerfile
-    environment:
-      DATABASE_URL: "mysql://chessuser:chesspass@mariadb:3306/chessdb"
-      NODE_ENV: ${NODE_ENV}
-    ports:
-      - "3001:3001" # NÃO ALTERAR NESSA LINHA
-    depends_on:
-      mariadb:
-        condition: service_healthy
-
-  mariadb:
-    image: mariadb:11.4
-    container_name: chess-mariadb
-    restart: always
-    environment:
-      MARIADB_ROOT_PASSWORD: rootpassword
-      MARIADB_DATABASE: chessdb
-      MARIADB_USER: chessuser
-      MARIADB_PASSWORD: chesspass
-    ports:
-      - "3306:3306"
-    volumes:
-      - mariadb_data:/var/lib/mariadb
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-  redis:
-    image: redis
-    command: redis-server --requirepass Redis2025!
-    ports:
-      - "6379:6379"
-
-volumes:
-  mariadb_data:

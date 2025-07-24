@@ -35,6 +35,9 @@ if(process.env.NODE_ENV === "hml"){
   // allowedOrigins.push('http://192.168.0.171:5173');
   allowedOrigins.push('http://192.168.0.171:5173');
 }
+if(process.env.NODE_ENV === "prd"){
+  console.log('PRD!');
+}
 
 const corsOptions: CorsOptions = {
   origin: (origin, callback) => {

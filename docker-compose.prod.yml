@@ -4,17 +4,19 @@ services:
     container_name: ${NOME_CONTAINER}
     environment:
       DATABASE_URL: "mysql://chessuser:chesspass@mariadb:3306/chessdb"
+      REDIS_URL: "redis://:Redis2019!@redis:6379"
       NODE_ENV: ${NODE_ENV}
-    ports:
-      - "3001:3001" # NÃO ALTERAR NESSA LINHA
     depends_on:
       mariadb:
         condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "3001:3001"
 
   mariadb:
     image: mariadb:11.4
     container_name: chess-mariadb
-    restart: always
     environment:
       MARIADB_ROOT_PASSWORD: rootpassword
       MARIADB_DATABASE: chessdb
@@ -29,6 +31,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+
+  redis:
+    image: redis
+    command: redis-server --requirepass Redis2019!
+    ports:
+      - "6379:6379"
 
 volumes:
   mariadb_data:
