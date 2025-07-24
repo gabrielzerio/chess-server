@@ -13,6 +13,9 @@ services:
         condition: service_started
     ports:
       - "3001:3001"
+    networks:
+      - nginx-net
+      - default
 
   mariadb:
     image: mariadb:11.4
