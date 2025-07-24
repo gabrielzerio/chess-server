@@ -18,7 +18,7 @@ jobs:
           username: "ubuntu"
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.PORT }}
-          source: "./docker-compose.prod.yml"
+          source: "./docker-compose.prd.yml"
           target: "$HOME/aplicacoes/chess-api"
           overwrite: true
       - name: Execute remote SSH commands

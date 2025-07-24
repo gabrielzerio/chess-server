@@ -40,3 +40,7 @@ services:
 
 volumes:
   mariadb_data:
+
+networks:
+  nginx-net:
+    external: true
