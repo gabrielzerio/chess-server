@@ -1,0 +1,5 @@
+services:
+  chess-server:
+    build:
+      context: .
+      dockerfile: Dockerfile

@@ -18,8 +18,8 @@ jobs:
           username: "ubuntu"
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.PORT }}
-          source: "./docker-compose.yml"
-          target: "$HOME/aplicacoes"
+          source: "./docker-compose.prod.yml"
+          target: "$HOME/aplicacoes/chess-api"
           overwrite: true
       - name: Execute remote SSH commands
         uses: appleboy/ssh-action@v1
@@ -29,5 +29,5 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.PORT }}
           script: |
-            cd $HOME/aplicacoes
-            docker compose up -d
+            cd $HOME/aplicacoes/chess-api
+            NOME_CONTAINER=${{env.NOME_CONTAINER}} NODE_ENV=${{env.NODE_ENV}} docker-compose -f docker-compose.prod.yml up -d
