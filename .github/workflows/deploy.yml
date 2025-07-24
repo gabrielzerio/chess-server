@@ -30,4 +30,4 @@ jobs:
           port: ${{ secrets.PORT }}
           script: |
             cd $HOME/aplicacoes
-            docker compose up -d
+            NOME_CONTAINER=chess-api-prd docker compose up -d

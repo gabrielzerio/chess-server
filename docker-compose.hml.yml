@@ -1,12 +1,14 @@
 services:
   chess-server:
-    image: gabrielzerio/chess-api:latest
-    container_name: chess-api
+    container_name: ${NOME_CONTAINER}
+    build:
+      context: .
+      dockerfile: Dockerfile
     environment:
       DATABASE_URL: "mysql://chessuser:chesspass@mariadb:3306/chessdb"
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV}
     ports:
-      - "3001:3001"
+      - "3001:3001" # NÃO ALTERAR NESSA LINHA
     depends_on:
       mariadb:
         condition: service_healthy
@@ -29,6 +31,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+  redis:
+    image: redis
+    command: redis-server --requirepass Redis2025!
+    ports:
+      - "6379:6379"
 
 volumes:
   mariadb_data:
