@@ -30,4 +30,4 @@ jobs:
           port: ${{ secrets.PORT }}
           script: |
             cd $HOME/aplicacoes/chess-api
-            NOME_CONTAINER=${{env.NOME_CONTAINER}} NODE_ENV=${{env.NODE_ENV}} docker-compose -f docker-compose.prd.yml up -d
+            NOME_CONTAINER=${{env.NOME_CONTAINER}} NODE_ENV=${{env.NODE_ENV}} docker compose -f docker-compose.prod.yml up -d
