@@ -6,6 +6,6 @@
 * containerização da aplicação e DB
 requisitos para rodar o projeto, -> docker engine
 
-docker-compose -f docker-compose.prod.yml -f docker-compose.dev.yml up
+docker compose -f docker-compose.hml.yml up --build -d
 
 PORTA 3001
