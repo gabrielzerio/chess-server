@@ -18,6 +18,7 @@ interface PossibleMovesResponse {
 export class GameManager {
     private io: SocketIOServer;
     private games: ActiveGames = {}; // Armazena instâncias de Game por gameId
+    private players: Player[];
     // Map para armazenar timers de reconexão
     private reconnectionTimers: Map<string, { timer: NodeJS.Timeout, disconnectedPlayerID: string }> = new Map();
 
@@ -42,6 +43,7 @@ export class GameManager {
 
         return roomCode;
     }
+
     public createNewGame(playerName: string): GameAndPlayerID {
         let gameId: string;
         do {

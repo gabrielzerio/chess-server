@@ -1,11 +1,13 @@
 // class/game.ts
 
-import { Board, PieceColor, Position, EnPassantTarget, Player, PieceType, GameStatus, PlayerAlreadyExistsError, GameFullError } from '../models/types';
+import { Board, PieceColor, Position, EnPassantTarget, PieceType, GameStatus, PlayerAlreadyExistsError, GameFullError } from '../models/types';
 import { MoveContext, Piece } from './piece'; // Certifique-se de que Piece e MoveContext estão corretos
 import { PieceFactory } from '../models/PieceFactory';
 import { Pawn } from '../models/pieces/Pawn';
 import { King } from '../models/pieces/King';
 import { randomUUID } from 'crypto';
+import { Player } from './Player';
+import { GamePlayer } from './GamePlayer';
 
 // Interface para o retorno do applyMove, para ser mais claro
 export interface ApplyMoveResult {
@@ -19,14 +21,14 @@ export interface ApplyMoveResult {
 }
 
 export class Game {
-    private players: Player[];
+    private gamePlayers: GamePlayer[];
     private board: Board;
     private turn: PieceColor;
     private status: GameStatus; // Ex: 'waiting', 'playing', 'finished', 'paused'
     private enPassantTarget: EnPassantTarget | null;
 
     constructor(board: Board) {
-        this.players = [];
+        this.gamePlayers = [];
         this.board = board;
         this.turn = 'white'; // Branco sempre começa
         this.status = 'waiting'; // Estado inicial
@@ -40,8 +42,8 @@ export class Game {
     getTurn(): PieceColor {
         return this.turn;
     }
-    getPlayers(): Player[] {
-        return this.players;
+    getPlayers(): GamePlayer[] {
+        return this.gamePlayers;
     }
     getStatus(): GameStatus {
         return this.status;
@@ -51,26 +53,31 @@ export class Game {
     }
 
     // --- Métodos de Gerenciamento de Jogadores ---
+    createPlayer(playerName: String): string{
+      const genID = randomUUID();  
+      
+      return genID;
+    }
 
-    addPlayer(playerName: string): Player {
+    addPlayer(player: Player): GamePlayer {
         if (this.getActivePlayersCount() >= 2) {
             throw new GameFullError(); // Lança exceção
         }
-        if (this.players.some(p => p.playerName === playerName) && this.getPlayerByName(playerName)?.isOnline) {
-            throw new PlayerAlreadyExistsError(); // Lança exceção
-        }
-        const rescuePlayer = this.getPlayerByName(playerName);
-        if (rescuePlayer && !rescuePlayer.isOnline) {
-            return rescuePlayer;
-        }
-        const genID = randomUUID();
+        // if (this.gamePlayers.some(p => p.getPlayerName() === player.getPlayerName()) && player.getPlayerName()?) {
+        //     throw new PlayerAlreadyExistsError(); // Lança exceção
+        // }
+        // const rescuePlayer = this.getPlayerByName(player.getPlayerName());
+        // if (rescuePlayer && !rescuePlayer.getIsOnline) {
+        //     return rescuePlayer;
+        // }
+        
         const color: PieceColor = this.getPlayers().length === 0 ? 'white' : 'black';
-
-        const player: Player = { playerID: genID, playerName: playerName };
-        player.color = color;
-        player.isOnline = true; // Jogador está online ao ser adicionado
-        this.players.push(player);
-        return player; // Retorna true se adicionado com sucesso 
+        const gamePlayer = new GamePlayer(player, color);
+        // const player: Player = { playerID: genID, playerName: playerName };
+        gamePlayer.color = color;
+        gamePlayer.isOnline = true; // Jogador está online ao ser adicionado
+        this.gamePlayers.push(gamePlayer);
+        return gamePlayer; // Retorna true se adicionado com sucesso 
     }
 
     // NOVO: Retorna o jogador pelo socketId ou undefined
@@ -88,7 +95,7 @@ export class Game {
 
     // Refatorado: Retorna o jogador pelo nome ou undefined, sem lançar erro
     public getPlayerByName(playerName: string): Player | void {
-        return this.players.find(p => p.playerName === playerName);
+        return this.gamePlayers.find(p => p.getPlayerName() === playerName);
     }
 
     // NOVO: Marca um jogador como desconectado
@@ -273,8 +280,7 @@ export class Game {
     }
 
     // NOVO: Método principal para aplicar um movimento, retorna um resultado estruturado
-    public async applyMove(socketId: string, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
-        const player = this.getPlayerByID(socketId);
+    public async applyMove(player:Player, socketId: string, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
         if (!player || player.color !== this.turn) {
             return { success: false, message: 'Not your turn or player not found.' };
         }

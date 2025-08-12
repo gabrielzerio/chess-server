@@ -33,7 +33,7 @@ export const createGame = async (req: Request, res: Response): Promise<any> => {
 
 export const joinGame = async (req: Request, res: Response): Promise<any> => {
     const reqPlayerName = req.body.playerName;
-    const gameID = req.body.gameID;
+    const gameID = req.params.gameID; // Pega da URL
     if (!gameManagerInstance) {
         throw new Error('GameManager not initialized.');
     }

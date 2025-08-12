@@ -11,15 +11,7 @@ export interface Position {
 export interface EnPassantTarget {
   row: number;
   col: number;
-}
 
-export interface Player{
- playerName: string; 
- color?: PieceColor; 
- playerID: string | null;
- isOnline?: boolean;
- disconnectedAt?: number;
-}
 
 export interface GameAndPlayerID{
     gameID: string;

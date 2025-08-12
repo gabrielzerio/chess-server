@@ -13,20 +13,19 @@ export function publicRoutersetInstance(gmr: GameManager){
       status: 'ok', 
       message: 'API is running and healthy!' 
     });
-  });
-
-  publicRouter.get('/registerTest', (req: Request, res: Response) => {
-    res.status(200).json({
-      
-    })
-    
-  });
-  
+  });  
 
   publicRouter.get('/activeGames', (req: Request, res: Response) => {
     const games = gameMgr.getAllGames()
     
     res.status(200).json(games);
   });
+
+  publicRouter.get('/activePlayers/:codeRoom', (req: Request, res:Response) => {
+    const codeRoom = req.params.codeRoom; // Pega da URL
+    console.log(codeRoom);
+    const players = gameMgr.getGame(codeRoom)?.getPlayers();
+    return res.status(200).json(players);
+  })
 
 
