@@ -1,4 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Game } from "@prisma/client";
+import { error } from "console";
 
 const prisma = new PrismaClient();
 
@@ -47,10 +48,11 @@ class GameService {
     return player;
   }
 
-  async createGameWithPlayerWhite(playerWhiteId: number) {
+  async addPlayerWhiteToGame(roomCode: string, playerWhiteId: number): Promise<Game> {
     const game = await prisma.game.create({
       data: {
         playerWhite: { connect: { id: playerWhiteId } },
+        roomCode: roomCode
       },
     });
     console.log('Novo jogo criado:', game);
@@ -66,6 +68,18 @@ class GameService {
     });
     console.log('Segundo jogador adicionado:', updatedGame);
     return updatedGame;
+  }
+
+  async selectTableGameId(roomCode: string): Promise<number> {
+    const tableGame = await prisma.game.findFirst({
+      where: {roomCode: roomCode}  
+    });
+    console.log("id do jogo", tableGame?.id);
+    if(tableGame != null)
+    return tableGame.id;
+    else{
+      throw new Error("game id da tabela é nulo");
+    }
   }
 
   async finishGame(gameId: number, winnerId: number) {

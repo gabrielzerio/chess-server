@@ -1,12 +1,8 @@
-// gameController.ts
-
 import { Request, Response } from 'express';
-import { GameManager } from '../gameManager'; // Importe seu GameManager
+import { GameManager } from '../gameManager'; 
 import GameService from './services/gameService';
 
-// Assumindo que você terá uma instância global ou injetada do GameManager
-// Para simplicidade, vamos exportar uma função que aceita o gameManager
-// Ou, se você inicializar o GameManager em seu main server.ts, pode passá-lo para suas rotas
+
 let gameManagerInstance: GameManager;
 const gameService = new GameService();
 
@@ -25,18 +21,17 @@ export const createGame = async (req: Request, res: Response): Promise<any> => {
             throw new Error('Player name is required.');
         }
 
-
         const playerCred = gameManagerInstance.createNewGame(reqPlayerName);
         
         const whiteP = await gameService.createPlayer(reqPlayerName, 0);
-        await gameService.createGameWithPlayerWhite(whiteP.id);
+        await gameService.addPlayerWhiteToGame(playerCred.gameID, whiteP.id);
         return res.json({ gameID: playerCred?.gameID, playerID: playerCred?.playerID });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        res.status(400).json({ error: error.message });
     }
 };
 
-export const joinGame = (req: Request, res: Response): any => {
+export const joinGame = async (req: Request, res: Response): Promise<any> => {
     const reqPlayerName = req.body.playerName;
     const gameID = req.body.gameID;
     if (!gameManagerInstance) {
@@ -52,6 +47,12 @@ export const joinGame = (req: Request, res: Response): any => {
         const game = gameManagerInstance.getGame(gameID);
         if (game) {
             const playerCred = game.addPlayer(reqPlayerName);
+            const blackP = await gameService.createPlayer(reqPlayerName, 0);
+            const gameId = await gameService.selectTableGameId(gameID);
+            if (!gameId) {
+                throw new Error("O jogo não foi encontrado no banco de dados.");
+            }
+            await gameService.addPlayerBlackToGame(gameId, blackP.id);
             return res.json({ gameID: gameID, playerID: playerCred.playerID });
         }
         else {

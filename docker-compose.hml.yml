@@ -32,6 +32,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    ports:
+      - "3307:3306"
     volumes:
       - mariadb_data:/var/lib/mariadb
 

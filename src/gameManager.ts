@@ -5,6 +5,7 @@ import { Game } from './class/game'; // Sua classe Game
 import { Position, PieceType, GameAndPlayerID } from './models/types'; // Seus tipos
 import { createInitialBoard } from './utils/boardSetup'; // Sua função de criação de tabuleiro
 
+
 // Definindo o tipo para a coleção de jogos
 interface ActiveGames {
     [gameId: string]: Game;
@@ -25,28 +26,41 @@ export class GameManager {
     }
 
     // --- Métodos de Gerenciamento de Jogos (chamados principalmente pelo Express, ou internamente) ---
-    public getAllGames():ActiveGames{
+    public getAllGames(): ActiveGames {
         return this.games;
     }
-    public createNewGame(playerName: string): GameAndPlayerID | undefined {
-        if (!playerName)
-            return;
-        const gameId = Math.random().toString(36).substr(2, 4);
+    private generateRoomCode(): string {
+        // Cria um array com os códigos ASCII para 'a' até 'z' (97-122) e '0' até '9' (48-57)
+        const charCodes = [
+            ...Array.from({ length: 26 }, (_, i) => 97 + i), // a-z
+            ...Array.from({ length: 10 }, (_, i) => 48 + i)  // 0-9
+        ];
+
+        const roomCode = Array.from({ length: 5 }, () =>
+            String.fromCharCode(charCodes[Math.floor(Math.random() * charCodes.length)])
+        ).join('');
+
+        return roomCode;
+    }
+    public createNewGame(playerName: string): GameAndPlayerID {
+        let gameId: string;
+        do {
+            gameId = this.generateRoomCode();
+        } while (this.games[gameId]); // Garante que o ID seja único
+
         const game = new Game(createInitialBoard());
-        let player;
-        try {
-            player = game.addPlayer(playerName);
-        } catch (error) {
-            throw error;
+        
+        // A lógica de adicionar jogador e armazenar o jogo agora é mais direta.
+        // Se addPlayer lançar um erro, ele será propagado para o controller.
+        const player = game.addPlayer(playerName);
+        
+        // Checagem de segurança para garantir que o playerID foi criado.
+        if (!player || !player.playerID) {
+            throw new Error("Falha ao criar o jogador ou o ID do jogador está nulo.");
         }
-
         this.games[gameId] = game;
-
         console.log(`Game created: ${gameId}`);
-        if (player.playerID)
-            return { gameID: gameId, playerID: player.playerID };
-        else
-            return;
+        return { gameID: gameId, playerID: player.playerID };
     }
 
     public getGame(gameId: string): Game | null {
@@ -146,7 +160,7 @@ export class GameManager {
                 turn: game.getTurn(),
                 status: game.getStatus()
             });
-            socket.to(gameId).emit('roomJoinMessage', {playerName: player.playerName})
+            socket.to(gameId).emit('roomJoinMessage', { playerName: player.playerName })
             if (game.getActivePlayersCount() === 2) {
                 game.setStatus('playing')
 
@@ -219,12 +233,12 @@ export class GameManager {
         if (moveResult.success) {
             this.io.to(socket.gameID).emit('boardUpdate', { board: moveResult.board, turn: moveResult.turn, status: moveResult.status });
             if (moveResult.winner) {
-                this.io.to(socket.gameID).emit('gameOver',  { winner: game.getTurn() === 'white' ? 'black' : 'white', status: moveResult.status, playerWinner:player?.playerName });
+                this.io.to(socket.gameID).emit('gameOver', { winner: game.getTurn() === 'white' ? 'black' : 'white', status: moveResult.status, playerWinner: player?.playerName });
                 // Considera remover o jogo se ele acabou
                 // this.deleteGame(gameId); // Descomentar se quiser remover automaticamente
             } else if (moveResult.status === 'checkmate') {
                 // Caso específico de xeque-mate sem winner direto no retorno, trate aqui
-                this.io.to(socket.gameID).emit('gameOver', { winner: game.getTurn() === 'white' ? 'black' : 'white', message:"Cheque mate", status: moveResult.status, playerWinner:player?.playerName });
+                this.io.to(socket.gameID).emit('gameOver', { winner: game.getTurn() === 'white' ? 'black' : 'white', message: "Cheque mate", status: moveResult.status, playerWinner: player?.playerName });
                 // this.deleteGame(gameId);
             }
         } else {
@@ -276,7 +290,7 @@ export class GameManager {
                             if (stillDisconnectedPlayer && !stillDisconnectedPlayer.isOnline) {
                                 if (playerWinner) {
                                     currentGame.setStatus('ended');
-                                    this.io.to(gameId).emit('gameOver', { status: 'abandoned', playerWinner:player.playerName, message: `${stillDisconnectedPlayer.playerName} não se reconectou a tempo` });
+                                    this.io.to(gameId).emit('gameOver', { status: 'abandoned', playerWinner: player.playerName, message: `${stillDisconnectedPlayer.playerName} não se reconectou a tempo` });
                                 } else {
                                     currentGame.setStatus('abandoned');
                                     this.io.to(gameId).emit('gameAbandoned', { message: 'Game abandoned due to unresolved disconnection.' });
@@ -290,7 +304,7 @@ export class GameManager {
                     this.reconnectionTimers.set(gameId, { timer, disconnectedPlayerID: playerID });
                     console.log(`Reconnection timer started for player ${playerID} in game ${gameId}.`);
                 }
-                if(game.getActivePlayersCount() < 1){
+                if (game.getActivePlayersCount() < 1) {
                     this.deleteGame(gameId)
                 }
             }
