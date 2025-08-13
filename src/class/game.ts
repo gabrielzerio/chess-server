@@ -81,9 +81,9 @@ export class Game {
     }
 
     // NOVO: Retorna o jogador pelo socketId ou undefined
-    public getPlayerByID(playerID: string): Player | null{
+    public getPlayerByID(playerID: string): GamePlayer | null{
         try {
-            const player = this.players.find(p => p.playerID === playerID);
+            const player = this.gamePlayers.find(p => p.getPlayerId() === playerID);
             if (player) {
                 return player;
             }
@@ -94,21 +94,21 @@ export class Game {
     }
 
     // Refatorado: Retorna o jogador pelo nome ou undefined, sem lançar erro
-    public getPlayerByName(playerName: string): Player | void {
+    public getPlayerByName(playerName: string): GamePlayer | void {
         return this.gamePlayers.find(p => p.getPlayerName() === playerName);
     }
 
     // NOVO: Marca um jogador como desconectado
-    public setPlayerOnlineStatus(playerID: string, isOnline: boolean): Player | null {
+    public setPlayerOnlineStatus(playerID: string, isOnline: boolean): GamePlayer | null {
         const player = this.getPlayerByID(playerID);
         if (player) {
             player.isOnline = isOnline;
             if (!isOnline) {
                 player.disconnectedAt = Date.now();
-                console.log(`Player ${player.playerName} (${playerID}) marked as offline.`);
+                console.log(`Player ${player.getPlayerName()} (${playerID}) marked as offline.`);
             } else {
                 delete player.disconnectedAt; // Remove o timestamp ao reconectar
-                console.log(`Player ${player.playerName} (${playerID}) marked as online.`);
+                console.log(`Player ${player.getPlayerName()} (${playerID}) marked as online.`);
             }
             return player;
         }
@@ -117,7 +117,7 @@ export class Game {
 
     // NOVO: Conta jogadores ativos (online e com playerID)
     public getActivePlayersCount(): number {
-        return this.players.filter(p => p.playerID && p.isOnline).length;
+        return this.gamePlayers.filter(p => p.getPlayerId() && p.isOnline).length;
     }
 
     // Aprimorado: Gerencia a desconexão do jogador (usado internamente ou se precisar da lógica antiga)
@@ -280,8 +280,9 @@ export class Game {
     }
 
     // NOVO: Método principal para aplicar um movimento, retorna um resultado estruturado
-    public async applyMove(player:Player, socketId: string, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
-        if (!player || player.color !== this.turn) {
+    public async applyMove(player:Player, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
+        const gamePlayer = this.getPlayerByID(player.getPlayerId());
+        if (!player || gamePlayer?.color !== this.turn) {
             return { success: false, message: 'Not your turn or player not found.' };
         }
 
@@ -310,7 +311,7 @@ export class Game {
         }
 
         // Após o movimento bem-sucedido, verifique se o próprio rei está em xeque
-        if (this.isKingInCheck(player.color)) {
+        if (this.isKingInCheck(gamePlayer.color)) {
             // Se o movimento deixou o próprio rei em xeque, ele é ilegal
             this.board = originalBoard; // Reverte o tabuleiro
             this.enPassantTarget = originalEnPassantTarget; // Reverte enPassant

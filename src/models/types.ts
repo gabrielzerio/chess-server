@@ -11,7 +11,7 @@ export interface Position {
 export interface EnPassantTarget {
   row: number;
   col: number;
-
+}
 
 export interface GameAndPlayerID{
     gameID: string;

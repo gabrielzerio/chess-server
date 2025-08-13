@@ -10,7 +10,7 @@ export const setGameManager = (manager: GameManager) => {
     gameManagerInstance = manager;
 };
 
-export const createGame = async (req: Request, res: Response): Promise<any> => {
+export const createGame = async (req: Request, res: Response) => {
     const reqPlayerName = req.body.playerName;
 
     try {
@@ -31,7 +31,7 @@ export const createGame = async (req: Request, res: Response): Promise<any> => {
     }
 };
 
-export const joinGame = async (req: Request, res: Response): Promise<any> => {
+export const joinGame = async (req: Request, res: Response) => {
     const reqPlayerName = req.body.playerName;
     const gameID = req.params.gameID; // Pega da URL
     if (!gameManagerInstance) {
@@ -53,7 +53,7 @@ export const joinGame = async (req: Request, res: Response): Promise<any> => {
                 throw new Error("O jogo não foi encontrado no banco de dados.");
             }
             await gameService.addPlayerBlackToGame(gameId, blackP.id);
-            return res.json({ gameID: gameID, playerID: playerCred.playerID });
+            res.json({ gameID: gameID, playerID: playerCred.playerID });
         }
         else {
             throw new Error("O jogo não existe");
@@ -64,7 +64,7 @@ export const joinGame = async (req: Request, res: Response): Promise<any> => {
     }
 };
 
-export const gameExists = (req: Request, res: Response): any => {
+export const gameExists = (req: Request, res: Response) => {
     const gameID = req.body.gameID;
     const playerID = req.body.playerID;
 
