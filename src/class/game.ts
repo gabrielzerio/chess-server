@@ -53,10 +53,10 @@ export class Game {
     }
 
     // --- Métodos de Gerenciamento de Jogadores ---
-    createPlayer(playerName: String): string{
-      const genID = randomUUID();  
-      
-      return genID;
+    createPlayer(playerName: String): string {
+        const genID = randomUUID();
+
+        return genID;
     }
 
     addPlayer(player: Player): GamePlayer {
@@ -70,26 +70,24 @@ export class Game {
         // if (rescuePlayer && !rescuePlayer.getIsOnline) {
         //     return rescuePlayer;
         // }
-        
+
         const color: PieceColor = this.getPlayers().length === 0 ? 'white' : 'black';
         const gamePlayer = new GamePlayer(player, color);
-        // const player: Player = { playerID: genID, playerName: playerName };
+        // const player: Player = { playerId: genID, playerName: playerName };
         gamePlayer.color = color;
         gamePlayer.isOnline = true; // Jogador está online ao ser adicionado
         this.gamePlayers.push(gamePlayer);
+        // console.log(this.gamePlayers);
         return gamePlayer; // Retorna true se adicionado com sucesso 
     }
 
     // NOVO: Retorna o jogador pelo socketId ou undefined
-    public getPlayerByID(playerID: string): GamePlayer | null{
-        try {
-            const player = this.gamePlayers.find(p => p.getPlayerId() === playerID);
-            if (player) {
-                return player;
-            }
-        } catch (error) {
-            console.error(error);
-        }
+    public getPlayerByID(playerId: string): GamePlayer | null {
+
+        const player = this.gamePlayers.find(p => p.getPlayerId() === playerId);
+        if(player){
+            return player;
+        }        
         return null;
     }
 
@@ -99,34 +97,34 @@ export class Game {
     }
 
     // NOVO: Marca um jogador como desconectado
-    public setPlayerOnlineStatus(playerID: string, isOnline: boolean): GamePlayer | null {
-        const player = this.getPlayerByID(playerID);
+    public setPlayerOnlineStatus(playerId: string, isOnline: boolean): GamePlayer | null {
+        const player = this.getPlayerByID(playerId);
         if (player) {
             player.isOnline = isOnline;
             if (!isOnline) {
                 player.disconnectedAt = Date.now();
-                console.log(`Player ${player.getPlayerName()} (${playerID}) marked as offline.`);
+                console.log(`Player ${player.getPlayerName()} (${playerId}) marked as offline.`);
             } else {
                 delete player.disconnectedAt; // Remove o timestamp ao reconectar
-                console.log(`Player ${player.getPlayerName()} (${playerID}) marked as online.`);
+                console.log(`Player ${player.getPlayerName()} (${playerId}) marked as online.`);
             }
             return player;
         }
         return null;
     }
 
-    // NOVO: Conta jogadores ativos (online e com playerID)
+    // NOVO: Conta jogadores ativos (online e com playerId)
     public getActivePlayersCount(): number {
         return this.gamePlayers.filter(p => p.getPlayerId() && p.isOnline).length;
     }
 
     // Aprimorado: Gerencia a desconexão do jogador (usado internamente ou se precisar da lógica antiga)
-    // public removePlayerByPlayerID(playerID: string): Player | null {
-    //     const player = this.getPlayerByID(playerID);
+    // public removePlayerByPlayerID(playerId: string): Player | null {
+    //     const player = this.getPlayerByID(playerId);
     //     if (player) {
-    //         player.playerID = null; // Isso era para liberar o slot, mas para reconexão, melhor manter o ID e usar 'isOnline'
+    //         player.playerId = null; // Isso era para liberar o slot, mas para reconexão, melhor manter o ID e usar 'isOnline'
     //         player.isOnline = false;
-    //         console.log(`Player ${player.playerName} (${playerID}) slot potentially freed. Marked as offline.`);
+    //         console.log(`Player ${player.playerName} (${playerId}) slot potentially freed. Marked as offline.`);
     //     }
     //     return player;
     // }
@@ -280,7 +278,7 @@ export class Game {
     }
 
     // NOVO: Método principal para aplicar um movimento, retorna um resultado estruturado
-    public async applyMove(player:Player, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
+    public async applyMove(player: Player, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
         const gamePlayer = this.getPlayerByID(player.getPlayerId());
         if (!player || gamePlayer?.color !== this.turn) {
             return { success: false, message: 'Not your turn or player not found.' };

@@ -15,7 +15,7 @@ export interface EnPassantTarget {
 
 export interface GameAndPlayerID{
     gameID: string;
-    playerID:string;
+    playerId:string;
 }
 
 export class GameError extends Error {

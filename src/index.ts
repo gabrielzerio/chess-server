@@ -1,41 +1,37 @@
 import express from 'express';
 import cors, { CorsOptions } from 'cors';
 import http from 'http';
-import {Server} from 'socket.io';
-import gameRoutes from './router/privateGameRoutes';
-
-import { GameManager } from './gameManager';
-import * as gameController from './router/gameController'
+import { Server } from 'socket.io';
+import { privateGameRouter } from './routes/privateGameRouter';
+import { GameController } from './controllers/gameController';
+import { publicGameRouter } from './routes/publicGameRouter';
 
 import 'dotenv/config';
-import  {publicRouter, publicRoutersetInstance}  from './router/publicRoutes';
 
 // Extend Socket type to include username property
 declare module 'socket.io' {
   interface Socket {
-    playerID: string;
-    gameID:string;
+    playerId: string;
+    gameID: string;
   }
 }
 
 const app: express.Application = express();
-
-app.use(publicRouter);
 
 const allowedOrigins = [
   'https://chess-front-eight.vercel.app',
   'https://chess-front-git-develop-gabrielzerios-projects.vercel.app'
 ];
 
-if(process.env.NODE_ENV === "hml"){
+if (process.env.NODE_ENV === "hml") {
   allowedOrigins.push('http://localhost:5173');
   allowedOrigins.push('http://127.0.0.1:5173');
-  allowedOrigins.push('https://localhost:5173'); 
+  allowedOrigins.push('https://localhost:5173');
   allowedOrigins.push('https://127.0.0.1:5173');
   // allowedOrigins.push('http://192.168.0.171:5173');
   allowedOrigins.push('http://192.168.0.171:5173');
 }
-if(process.env.NODE_ENV === "prd"){
+if (process.env.NODE_ENV === "prd") {
   console.log('PRD!');
 }
 
@@ -50,7 +46,7 @@ const corsOptions: CorsOptions = {
   },
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials:true
+  credentials: true
 };
 
 app.use(express.json());
@@ -62,40 +58,43 @@ app.use(cors(corsOptions));
 //   }
 //   next();
 // })
-app.use((req, res, next):any =>{ //middleware de joinGame precisa obrigatoriamente de gameID e nome(mid acima)
-  if(req.method === 'POST' && req.path === '/joinGame'){
-    const gameID = req.body?.gameID;
-
-    if(!gameID){
-      return res.status(400).json({"error":"Game ID is required to join in game"});
+app.use((req, res, next): any => { //middleware de joinGame precisa obrigatoriamente de gameID e nome(mid acima)
+  if (req.method === 'POST' && req.path.startsWith('/games')) {
+    const gameId = req.query?.gameId;
+    const playerId = req.body?.playerId;
+    console.log(req.query.gameId);
+    if (!gameId) {
+      return res.status(400).json({ "error": "Game Id is required to join in game" });
+    }
+    if (!playerId) {
+      return res.status(400).json({ "error": "Player Id is required to join in game" });
     }
   }
   next();
 })
-app.use(gameRoutes);
-
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: corsOptions
 });
 
-const gameManager = new GameManager(io);
+const gameController = new GameController(io);
+
+app.use(privateGameRouter(gameController));
+app.use(publicGameRouter(gameController));
 
 io.use((socket, next) => {
-  const {playerID, gameID} = socket.handshake.auth;
-  socket.playerID = playerID;
+  const { playerId, gameID } = socket.handshake.auth;
+  socket.playerId = playerId;
   socket.gameID = gameID;
-  if(!socket.playerID || !socket.gameID)
+  if (!socket.playerId || !socket.gameID) {
     return;
-    next();
+  }
+  next();
 })
 
-
-gameController.setGameManager(gameManager);
-publicRoutersetInstance(gameManager)
- io.on('connection', (socket) => {
-    gameManager.handleSocketConnection(socket); // Delega o socket para o GameManager
+io.on('connection', (socket) => {
+  gameController.handleSocketConnection(socket); // Delega o socket para o GameManager
 });
 
 server.listen(3001, () => console.log('API e WebSocket rodando na porta 3001'));

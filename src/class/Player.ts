@@ -3,14 +3,14 @@ import { randomUUID } from "crypto";
 export class Player {
     private playerName: string;
     // private color?: PieceColor;
-    private playerID: string;
+    private playerId: string;
     // private elo: number;
     // private isOnline: boolean;
     // private disconnectedAt?: number;
 
     constructor(playerName: string) {
         this.playerName = playerName;
-        this.playerID = randomUUID();
+        this.playerId = randomUUID();
         // this.isOnline = false;
     }
 
@@ -27,6 +27,6 @@ export class Player {
     // }
 
     getPlayerId():string{
-        return this.playerID;
+        return this.playerId;
     }
 }
