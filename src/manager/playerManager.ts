@@ -13,6 +13,10 @@ export class PlayerManager {
         return player;
     }
 
+    public createPlayer(){
+        
+    }
+
     public getPlayerById(playerId: string): Player {
         const player = this.players.find(p => p.getPlayerId() === playerId);
         if (!player) throw new Error('Nenhum jogador com esse ID foi encontrado');

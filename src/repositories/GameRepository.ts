@@ -1,5 +1,5 @@
 // repositories/GameRepository.ts
-import { Game } from '../class/game';
+import { Game } from '../class/Game';
 
 export class GameRepository {
   private games: Record<string, Game> = {};

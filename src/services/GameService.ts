@@ -1,7 +1,7 @@
 // services/GameService.ts
 import { EventEmitter } from 'events';
 import { GameRepository } from '../repositories/GameRepository';
-import { Game } from '../class/game';
+import { Game } from '../class/Game';
 import { Player } from '../class/Player';
 import { Position, PieceType, PieceColor } from '../models/types';
 import { createInitialBoard } from '../utils/boardSetup';

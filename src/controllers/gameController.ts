@@ -1,5 +1,5 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import { Game } from '../class/game'; // Sua classe Game
+import { Game } from '../class/Game'; // Sua classe Game
 import { Position, PieceType, GameAndPlayerID } from '../models/types'; // Seus tipos
 import { createInitialBoard } from '../utils/boardSetup'; // Sua função de criação de tabuleiro
 import { Player } from '../class/Player';
