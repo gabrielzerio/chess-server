@@ -2,9 +2,12 @@ import express from 'express';
 import cors, { CorsOptions } from 'cors';
 import http from 'http';
 import { Server } from 'socket.io';
-import { privateGameRouter } from './routes/privateGameRouter';
-import { GameController } from './controllers/gameController';
-import { publicGameRouter } from './routes/publicGameRouter';
+import { privateGameRouter } from './controllers/privateGameRouter';
+import { GameManager } from './manager/GameManager';
+import { GameService } from './services/gameService';
+import { GameRepository } from './repositories/GameRepository';
+import { PlayerRepository } from './repositories/PlayerRepository';
+import { publicGameRouter } from './controllers/publicGameRouter';
 
 import 'dotenv/config';
 
@@ -78,10 +81,14 @@ const io = new Server(server, {
   cors: corsOptions
 });
 
-const gameController = new GameController(io);
+// Instancia repositórios e manager
+const gameRepository = new GameRepository();
+const playerRepository = new PlayerRepository();
+const gameManager = new GameManager(gameRepository, playerRepository);
+const gameService = new GameService(gameManager, gameRepository, playerRepository);
 
-app.use(privateGameRouter(gameController));
-app.use(publicGameRouter(gameController));
+app.use(privateGameRouter(gameService));
+app.use(publicGameRouter(gameService));
 
 io.use((socket, next) => {
   const { playerId, gameID } = socket.handshake.auth;
@@ -91,10 +98,15 @@ io.use((socket, next) => {
     return;
   }
   next();
-})
+});
+
+
+// Integração do GameSocketHandler
+import { GameSocketHandler } from './sockets/GameSocketHandler';
+const gameSocketHandler = new GameSocketHandler(io, gameManager);
 
 io.on('connection', (socket) => {
-  gameController.handleSocketConnection(socket); // Delega o socket para o GameManager
+  gameSocketHandler.registerHandlers(socket);
 });
 
 server.listen(3001, () => console.log('API e WebSocket rodando na porta 3001'));

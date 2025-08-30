@@ -44,6 +44,6 @@ export class PlayerAlreadyExistsError extends GameError {
 
 import { DecorateAcknowledgementsWithMultipleResponses, DefaultEventsMap } from 'socket.io/dist/typed-events';
 // Import da classe base Piece
-import { Piece } from '../class/piece';
+import { Piece } from '../class/Piece';
 import { BroadcastOperator } from 'socket.io';
 export type Board = (Piece | null)[][];

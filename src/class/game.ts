@@ -1,133 +1,55 @@
-// class/game.ts
-
-import { Board, PieceColor, Position, EnPassantTarget, PieceType, GameStatus, PlayerAlreadyExistsError, GameFullError } from '../models/types';
-import { MoveContext, Piece } from './piece'; // Certifique-se de que Piece e MoveContext estão corretos
+import { Board, PieceColor, Position, PieceType, GameStatus, EnPassantTarget } from '../models/types';
+import { Player } from './Player';
+import { GamePlayer } from './GamePlayer';
+import { Piece, MoveContext } from './piece';
 import { PieceFactory } from '../models/PieceFactory';
 import { Pawn } from '../models/pieces/Pawn';
 import { King } from '../models/pieces/King';
-import { randomUUID } from 'crypto';
-import { Player } from './Player';
-import { GamePlayer } from './GamePlayer';
 
-// Interface para o retorno do applyMove, para ser mais claro
-export interface ApplyMoveResult {
+interface ApplyMoveResult {
     success: boolean;
     message?: string;
-    board?: Board; // Board serializado
+    board?: any;
     turn?: PieceColor;
-    status?: GameStatus;
+    status?: GameStatus | string;
     winner?: PieceColor;
-    isCheck?: boolean; // Adicionado para indicar xeque
+    isCheck?: boolean;
 }
 
 export class Game {
-    private gamePlayers: GamePlayer[];
+    private gamePlayers: { [playerId: string]: GamePlayer } = {};
+    addGamePlayer(gamePlayer: GamePlayer) {
+        this.gamePlayers[gamePlayer.getPlayerId()] = gamePlayer;
+    }
+
+    getGamePlayerById(playerId: string): GamePlayer | undefined {
+        return this.gamePlayers[playerId];
+    }
+
+    getAllGamePlayers(): GamePlayer[] {
+        return Object.values(this.gamePlayers);
+    }
+
+    countPlayersInGame(): number {
+        return Object.values(this.gamePlayers).length;
+    }
     private board: Board;
     private turn: PieceColor;
-    private status: GameStatus; // Ex: 'waiting', 'playing', 'finished', 'paused'
+    private status: GameStatus;
     private enPassantTarget: EnPassantTarget | null;
 
     constructor(board: Board) {
-        this.gamePlayers = [];
         this.board = board;
-        this.turn = 'white'; // Branco sempre começa
-        this.status = 'waiting'; // Estado inicial
+        this.turn = "white";
+        this.status = "waiting";
         this.enPassantTarget = null;
+        // gamePlayers removido
     }
 
-    // --- Getters (mantidos) ---
-    getBoard(): Board {
-        return this.board;
-    }
-    getTurn(): PieceColor {
-        return this.turn;
-    }
-    getPlayers(): GamePlayer[] {
-        return this.gamePlayers;
-    }
-    getStatus(): GameStatus {
-        return this.status;
-    }
-    setStatus(status: GameStatus): void {
-        this.status = status;
-    }
+    // ... Métodos de manipulação de jogadores removidos. Agora responsabilidade do GameManager/PlayerRepository ...
 
-    // --- Métodos de Gerenciamento de Jogadores ---
-    createPlayer(playerName: String): string {
-        const genID = randomUUID();
+    // ... resto da lógica de tabuleiro e movimentos (igual a que você já tem)
 
-        return genID;
-    }
-
-    addPlayer(player: Player): GamePlayer {
-        if (this.getActivePlayersCount() >= 2) {
-            throw new GameFullError(); // Lança exceção
-        }
-        // if (this.gamePlayers.some(p => p.getPlayerName() === player.getPlayerName()) && player.getPlayerName()?) {
-        //     throw new PlayerAlreadyExistsError(); // Lança exceção
-        // }
-        // const rescuePlayer = this.getPlayerByName(player.getPlayerName());
-        // if (rescuePlayer && !rescuePlayer.getIsOnline) {
-        //     return rescuePlayer;
-        // }
-
-        const color: PieceColor = this.getPlayers().length === 0 ? 'white' : 'black';
-        const gamePlayer = new GamePlayer(player, color);
-        // const player: Player = { playerId: genID, playerName: playerName };
-        gamePlayer.color = color;
-        gamePlayer.isOnline = true; // Jogador está online ao ser adicionado
-        this.gamePlayers.push(gamePlayer);
-        // console.log(this.gamePlayers);
-        return gamePlayer; // Retorna true se adicionado com sucesso 
-    }
-
-    // NOVO: Retorna o jogador pelo socketId ou undefined
-    public getPlayerByID(playerId: string): GamePlayer | null {
-
-        const player = this.gamePlayers.find(p => p.getPlayerId() === playerId);
-        if(player){
-            return player;
-        }        
-        return null;
-    }
-
-    // Refatorado: Retorna o jogador pelo nome ou undefined, sem lançar erro
-    public getPlayerByName(playerName: string): GamePlayer | void {
-        return this.gamePlayers.find(p => p.getPlayerName() === playerName);
-    }
-
-    // NOVO: Marca um jogador como desconectado
-    public setPlayerOnlineStatus(playerId: string, isOnline: boolean): GamePlayer | null {
-        const player = this.getPlayerByID(playerId);
-        if (player) {
-            player.isOnline = isOnline;
-            if (!isOnline) {
-                player.disconnectedAt = Date.now();
-                console.log(`Player ${player.getPlayerName()} (${playerId}) marked as offline.`);
-            } else {
-                delete player.disconnectedAt; // Remove o timestamp ao reconectar
-                console.log(`Player ${player.getPlayerName()} (${playerId}) marked as online.`);
-            }
-            return player;
-        }
-        return null;
-    }
-
-    // NOVO: Conta jogadores ativos (online e com playerId)
-    public getActivePlayersCount(): number {
-        return this.gamePlayers.filter(p => p.getPlayerId() && p.isOnline).length;
-    }
-
-    // Aprimorado: Gerencia a desconexão do jogador (usado internamente ou se precisar da lógica antiga)
-    // public removePlayerByPlayerID(playerId: string): Player | null {
-    //     const player = this.getPlayerByID(playerId);
-    //     if (player) {
-    //         player.playerId = null; // Isso era para liberar o slot, mas para reconexão, melhor manter o ID e usar 'isOnline'
-    //         player.isOnline = false;
-    //         console.log(`Player ${player.playerName} (${playerId}) slot potentially freed. Marked as offline.`);
-    //     }
-    //     return player;
-    // }
 
     // --- Métodos de Tabuleiro e Peças (mantidos e aprimorados se necessário) ---
 
@@ -277,9 +199,8 @@ export class Game {
         return this.board.flat().filter((p): p is Piece => p !== null);
     }
 
-    // NOVO: Método principal para aplicar um movimento, retorna um resultado estruturado
     public async applyMove(player: Player, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
-        const gamePlayer = this.getPlayerByID(player.getPlayerId());
+        const gamePlayer = this.getGamePlayerById(player.getPlayerId());
         if (!player || gamePlayer?.color !== this.turn) {
             return { success: false, message: 'Not your turn or player not found.' };
         }
@@ -322,13 +243,13 @@ export class Game {
 
         const isCheckmate = this.verifyCheckMate();
         let winner: PieceColor | undefined;
-        let finalStatus = this.getStatus();
+        let finalStatus = this.status;
         let isCheck = false;
 
         if (isCheckmate) {
             winner = this.turn === 'white' ? 'black' : 'white'; // O vencedor é o oposto do turno atual
             finalStatus = 'ended';
-            this.setStatus(finalStatus);
+            this.status = finalStatus;
         } else {
             // Verifica se o próximo jogador (turno atual) está em xeque
             isCheck = this.isKingInCheck(this.turn);
@@ -339,7 +260,7 @@ export class Game {
         return {
             success: true,
             board: this.serializeBoard(), // Envia o board serializado
-            turn: this.getTurn(),
+            turn: this.turn,
             status: finalStatus,
             winner: winner,
             isCheck: isCheck // Indica se o rei do próximo turno está em xeque
