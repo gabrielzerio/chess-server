@@ -31,12 +31,12 @@ export function playerRegister(req: Request, res: Response): void { // se o clie
   }
   try {
     if (playerId) {
-      verifyPlayer = gameSvc.getPlayerById(playerId);
+      verifyPlayer = gameSvc.playerExists(playerId);
       verifyPlayer !== null ? res.status(200).json(verifyPlayer) : "";
     }
     else if (playerName) {
       const player = gameSvc.createPlayer(playerName);
-      console.log(player);
+      // console.log(player);
       res.status(200).json(player);
     }
   } catch (error: any) {
@@ -51,7 +51,7 @@ export function players(req: Request, res: Response) {
 
 export function activePlayers(req: Request, res: Response) {
   const codeRoom = req.params.codeRoom; // Pega da URL
-  const players = gameSvc.getGame(codeRoom)?.getPlayers();
+  const players = gameSvc.getGamePlayersAtGame(codeRoom);
   res.status(200).json(players);
 }
 

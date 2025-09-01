@@ -1,4 +1,3 @@
-; import { Position } from '../models/types';
 import { GameManager } from '../manager/GameManager';
 import { GameRepository } from '../repositories/GameRepository';
 import { PlayerRepository } from '../repositories/PlayerRepository';
@@ -6,7 +5,7 @@ import { Game } from '../class/game';
 import { createInitialBoard } from '../utils/boardSetup';
 import { Player } from '../class/Player';
 import { GamePlayer } from '../class/GamePlayer';
-import { GamePlayerRepository } from '../repositories/GamePlayerRepository';
+import { GameAndPlayerID, GameStatus, PieceType, Position } from '../models/types';
 
 export class GameService {
     private gameManager: GameManager;
@@ -19,18 +18,27 @@ export class GameService {
         this.playerRepository = playerRepository;
     }
 
-    public getPlayerById(playerId: string): any {
-        return this.gameManager.getPlayerById(playerId);
+    public playerExists(playerId: string): boolean {
+        const player = this.gameManager.getPlayerById(playerId);
+        if (player) {
+            return true;
+        }
+        return false;
     }
 
-    public getGamePlayerById(playerId:string): GamePlayer{
-        return this.gameManager.getPlayerById(playerId);
+    public getGamePlayerById(gameId: string, playerId: string): GamePlayer | null {
+        const gamePlayer = this.gameManager.getGamePlayerById(playerId, gameId);
+        if (gamePlayer) {
+            return gamePlayer
+        }
+        return null;
     }
 
-    public createPlayer(playerName: string): string {
+
+    public createPlayer(playerName: string): Player {
         const player = new Player(playerName);
         this.playerRepository.add(player);
-        return player.getPlayerId();
+        return player;
     }
 
     public createNewGame(playerId: string): string {
@@ -46,12 +54,32 @@ export class GameService {
         return gameId;
     }
 
-    public addPlayerInGame(player: any, gameId: string): any {
-        return this.gameManager.addPlayerToGame(gameId, player);
+    private getPlayer(playerId: string): Player | null {
+        const player = this.playerRepository.getById(playerId);
+        if (player) {
+            return player;
+        }
+        return null;
     }
 
-    public getGame(gameId: string): any {
-        return this.gameManager.getGame(gameId);
+    public addPlayerInGame(playerId: string, gameId: string): GamePlayer | null {
+        const player = this.getPlayer(playerId)
+        if (player) {
+            return this.gameManager.addPlayerToGame(gameId, player);
+        }
+        return null;
+    }
+
+    // private getGame(gameId: string): Game | null {
+    //     const game = this.gameManager.getGame(gameId);
+    //     if (game) {
+    //         return game;
+    //     } else {
+    //         return null;
+    //     }
+    // }
+    public gameExists(gameId: string): boolean {
+        return this.gameManager.gameExists(gameId);
     }
 
     public getAllGames() {
@@ -61,12 +89,66 @@ export class GameService {
     public getAllPlayers() {
         return this.playerRepository.getAll()
     }
+    public getGamePlayersAtGame(gameId: string): GamePlayer[] {
+        return this.gameManager.getGamePlayersAtGame(gameId);
+    }
+
+    private startReconnectionTimer(gameAndPlayerId: GameAndPlayerID) {
+        this.gameManager.setReconnectionTimer(gameAndPlayerId);
+    }
+
+    // Stub para dados de entrada no jogo
+    getJoinGameData(gameId: string, playerId: string) {
+        // Implemente a lógica real ou delegue ao GameManager
+        // return { error: 'Método não implementado', board: null, color: null, turn: null, status: 'waiting', playerName: '', players: [] };
+        const board = this.gameManager.getBoard(gameId);
+        const color = this.gameManager.getGamePlayerById(playerId, gameId)?.color;
+        const turn = this.gameManager.getGameTurn(gameId);
+        const status = this.gameManager.getGameStatus(gameId);
+        const playerName = this.gameManager.getGamePlayerById(playerId, gameId)?.getPlayerName();
+        const players = this.gameManager.getPlayers(gameId);
+        return {board, color, turn, status, playerName, players};
+    }
+
+    // Stub para atualizar status do jogo
+    setGameStatus(gameId: string, status: string) {
+        // Implemente a lógica real ou delegue ao GameManager
+        return true;
+    }
+
+    // Stub para dados de atualização do tabuleiro
+    getBoardUpdateData(gameId: string) {
+        // Implemente a lógica real ou delegue ao GameManager
+        return { board: null, turn: null, status: 'waiting' };
+    }
+
+    // Stub para dados de fim de jogo
+    getGameOverData(gameId: string, playerId: string, message?: string) {
+        // Implemente a lógica real ou delegue ao GameManager
+        return { winner: null, status: 'ended', playerWinner: null, message };
+    }
+
+    // Stub para desconexão de jogador
+    handlePlayerDisconnect(gameAndPlayerId: any, onTimeout: (gameId: string, playerId: string) => void) {
+        // Implemente a lógica real ou delegue ao GameManager
+        onTimeout(gameAndPlayerId.gameId, gameAndPlayerId.playerId);
+    }
 
     public deleteGame(gameId: string): boolean {
         return this.gameManager.deleteGame(gameId);
     }
 
+    public getGameTurn(gameId: string) {
+        return this.gameManager.getGameTurn(gameId);
+    }
 
+    public getGameStatus(gameId: string): GameStatus {
+        return this.gameManager.getGameStatus(gameId);
+    }
+
+    public makeMove(gameId: string, playerId: string, from: Position, to: Position, promotionType?: PieceType) {
+        return this.gameManager.makeMove(gameId, playerId, from, to, promotionType);
+    }
 
     private generateRoomCode(): string {
         // Cria um array com os códigos ASCII para 'a' até 'z' (97-122) e '0' até '9' (48-57)

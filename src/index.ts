@@ -8,6 +8,7 @@ import { GameService } from './services/gameService';
 import { GameRepository } from './repositories/GameRepository';
 import { PlayerRepository } from './repositories/PlayerRepository';
 import { publicGameRouter } from './controllers/publicGameRouter';
+import { GameSocketHandler } from './sockets/GameSocketHandler';
 
 import 'dotenv/config';
 
@@ -15,7 +16,7 @@ import 'dotenv/config';
 declare module 'socket.io' {
   interface Socket {
     playerId: string;
-    gameID: string;
+    gameId: string;
   }
 }
 
@@ -61,49 +62,74 @@ app.use(cors(corsOptions));
 //   }
 //   next();
 // })
-app.use((req, res, next): any => { //middleware de joinGame precisa obrigatoriamente de gameID e nome(mid acima)
-  if (req.method === 'POST' && req.path.startsWith('/games')) {
-    const gameId = req.query?.gameId;
+// Instancia repositórios e manager
+const gameRepository = new GameRepository();
+const playerRepository = new PlayerRepository();
+const gameManager = new GameManager(gameRepository, playerRepository);
+const gameService = new GameService(gameManager, gameRepository, playerRepository);
+app.use((req, res, next): any => { //middleware de joinGame precisa obrigatoriamente de gameId e nome(mid acima)
+  if (req.method === 'POST' && req.path.match('/games/createGame')) {
     const playerId = req.body?.playerId;
-    console.log(req.query.gameId);
-    if (!gameId) {
-      return res.status(400).json({ "error": "Game Id is required to join in game" });
-    }
     if (!playerId) {
-      return res.status(400).json({ "error": "Player Id is required to join in game" });
+      return res.status(400).json({ "error": "Player Id is required to create or join in game" });
     }
+
   }
   next();
 })
+
+app.use((req, res, next): any => {
+  const gameId = req.query?.gameId;
+  const playerId = req.body?.playerId;
+  if (req.method === 'POST' && req.path.match('/games/join')) {
+    if (!gameId) {
+      return res.status(400).json({ "error": "Game Id is required to join in game" });
+    }
+    const game = gameService.gameExists(gameId.toString());
+    const gamePlayer = gameService.playerExists(playerId);
+    if (!game || !gamePlayer) {
+      return res.status(401).json({ "error": "valid playerId and gameId are necessary to join a game" });
+    }
+  }
+  next();
+});
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: corsOptions
 });
 
-// Instancia repositórios e manager
-const gameRepository = new GameRepository();
-const playerRepository = new PlayerRepository();
-const gameManager = new GameManager(gameRepository, playerRepository);
-const gameService = new GameService(gameManager, gameRepository, playerRepository);
 
 app.use(privateGameRouter(gameService));
 app.use(publicGameRouter(gameService));
 
-io.use((socket, next) => {
-  const { playerId, gameID } = socket.handshake.auth;
+io.use((socket, next) => { //esse middleware valida somente na conexão
+  const { playerId, gameId } = socket.handshake.auth;
   socket.playerId = playerId;
-  socket.gameID = gameID;
-  if (!socket.playerId || !socket.gameID) {
-    return;
+  socket.gameId = gameId;
+  const game = gameService.gameExists(gameId);
+  const gamePlayer = gameService.getGamePlayerById(gameId, playerId);
+  if (!game || !gamePlayer) {
+    return next(new Error("Unauthorized"));
   }
   next();
 });
 
+io.of('/').use((socket, next) => {
+  const gameId = socket.gameId;
+  const gamePlayerId = socket.playerId;
+
+  const game = gameService.gameExists(gameId); //ajustar o problema aqui que não tem playuer ou game se o back-end voltar com o front ligado
+  const gamePlayer = gameService.getGamePlayerById(gameId, gamePlayerId);
+
+  if (!game || !gamePlayer) {
+    return next(new Error("Unauthorized"));
+  }
+  next();
+});
 
 // Integração do GameSocketHandler
-import { GameSocketHandler } from './sockets/GameSocketHandler';
-const gameSocketHandler = new GameSocketHandler(io, gameManager);
+const gameSocketHandler = new GameSocketHandler(io, gameService);
 
 io.on('connection', (socket) => {
   gameSocketHandler.registerHandlers(socket);

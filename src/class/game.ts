@@ -11,7 +11,7 @@ interface ApplyMoveResult {
     message?: string;
     board?: any;
     turn?: PieceColor;
-    status?: GameStatus | string;
+    status?: GameStatus;
     winner?: PieceColor;
     isCheck?: boolean;
 }
@@ -22,7 +22,7 @@ export class Game {
         this.gamePlayers[gamePlayer.getPlayerId()] = gamePlayer;
     }
 
-    getGamePlayerById(playerId: string): GamePlayer | undefined {
+    getGamePlayerById(playerId: string): GamePlayer {
         return this.gamePlayers[playerId];
     }
 
@@ -32,6 +32,12 @@ export class Game {
 
     countPlayersInGame(): number {
         return Object.values(this.gamePlayers).length;
+    }
+    setStatus(status: GameStatus) {
+        this.status = status;
+    }
+    getStatus(): GameStatus {
+        return this.status;
     }
     private board: Board;
     private turn: PieceColor;
@@ -199,9 +205,8 @@ export class Game {
         return this.board.flat().filter((p): p is Piece => p !== null);
     }
 
-    public async applyMove(player: Player, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
-        const gamePlayer = this.getGamePlayerById(player.getPlayerId());
-        if (!player || gamePlayer?.color !== this.turn) {
+    public async applyMove(gamePlayer: GamePlayer, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
+        if (gamePlayer?.color !== this.turn) {
             return { success: false, message: 'Not your turn or player not found.' };
         }
 

@@ -14,8 +14,8 @@ export interface EnPassantTarget {
 }
 
 export interface GameAndPlayerID{
-    gameID: string;
-    playerId:string;
+    gameId: string;
+    playerId: string;
 }
 
 export class GameError extends Error {
@@ -42,8 +42,6 @@ export class PlayerAlreadyExistsError extends GameError {
 
 
 
-import { DecorateAcknowledgementsWithMultipleResponses, DefaultEventsMap } from 'socket.io/dist/typed-events';
 // Import da classe base Piece
-import { Piece } from '../class/Piece';
-import { BroadcastOperator } from 'socket.io';
+import { Piece } from '../class/piece';
 export type Board = (Piece | null)[][];

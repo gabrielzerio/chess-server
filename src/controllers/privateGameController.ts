@@ -15,37 +15,38 @@ export class GameRoute {
 
     createGame = async (req: Request, res: Response) => {
         const reqPlayerId = req.body?.playerId;
+
         try {
+            const success = this.gameServiceInstance.playerExists(reqPlayerId);
+            if (!success) {
+                res.status(401).json("Player doesn't exist");
+            }
+            else {
+                const gameId = this.gameServiceInstance.createNewGame(reqPlayerId);
+                res.json({ gameId: gameId });
+            }
             // if (!reqPlayerId) {
             //     throw new Error('Player id is required.');
             // }
             // const player = this.gameServiceInstance.getPlayerById(reqPlayerId);
             // if (!player) throw new Error('Player not found.');
-            const gameId = this.gameServiceInstance.createNewGame(reqPlayerId);
-            res.json({ gameID: gameId });
         } catch (error: any) {
-            res.status(400).json({ error: error.message });
+            res.status(404).json({ error: error.message });
         }
     };
 
     joinGame = async (req: Request, res: Response): Promise<void> => {
         const reqPlayerId = req.body?.playerId;
         const gameId = req.query?.gameId?.toString();
-        if (!reqPlayerId) {
-            throw new Error('Player id is required.');
-        }
-        if (!gameId) {
-            throw new Error('Game id is required');
+        if (!reqPlayerId || !gameId) {
+            return;
         }
         try {
-            const player = this.gameServiceInstance.getPlayerById(reqPlayerId);
-            if (!player) throw new Error('Player not found.');
-            const gamePlayer = this.gameServiceInstance.addPlayerInGame(player, gameId);
+            const gamePlayer = this.gameServiceInstance.addPlayerInGame(reqPlayerId, gameId);
             if (!gamePlayer) throw new Error('Could not add player to game.');
             res.status(200).json({
-                playerName: gamePlayer.getPlayerName?.() ?? player.getPlayerName?.(),
-                playerId: gamePlayer.getPlayerId?.() ?? player.getPlayerId?.(),
-                color: gamePlayer.color ?? null
+                gameId: gameId,
+                playerId: gamePlayer.getPlayerId?.() ?? gamePlayer.getPlayerId?.()
             });
         } catch (error: any) {
             if (error instanceof GameFullError) {
@@ -60,21 +61,21 @@ export class GameRoute {
     };
 
     gameExists = (req: Request, res: Response) => {
-        const gameID = req.params.gameID;
+        const gameId = req.params.gameId;
         const playerId = req.body.playerId;
         try {
             if (!playerId) {
                 throw new Error('Player ID is required.');
             }
-            if (!gameID) {
+            if (!gameId) {
                 throw new Error('Game ID is required.');
             }
-            const vrfGameID = this.gameServiceInstance.getGame(gameID);
-            if (vrfGameID && vrfGameID.players?.find?.((p: any) => p.getPlayerId?.() === playerId)) {
-                res.status(200).json({ status: "ok" });
-            } else {
-                res.status(404).json({ error: 'Player not found in game.' });
-            }
+            const vrfGameID = this.gameServiceInstance.gameExists(gameId);
+            // if (vrfGameID && vrfGameID.players?.find?.((p: any) => p.getPlayerId?.() === playerId)) {
+            //     res.status(200).json({ status: "ok" });
+            // } else {
+            res.status(404).json({ error: 'Player not found in game.' });
+            // }
         } catch (error: any) {
             res.status(500).json({ error: error.message });
         }

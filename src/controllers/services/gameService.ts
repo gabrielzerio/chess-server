@@ -40,6 +40,35 @@ function decorateAllMethods(targetClass: any, decorator: any) {
 }
 
 class GameService {
+  // Stub para dados de entrada no jogo
+  getJoinGameData(gameId: string, playerId: string) {
+    // Implemente a lógica real ou delegue ao GameManager
+    return { error: 'Método não implementado', board: null, color: null, turn: null, status: 'waiting', playerName: '', players: [] };
+  }
+
+  // Stub para atualizar status do jogo
+  setGameStatus(gameId: string, status: string) {
+    // Implemente a lógica real ou delegue ao GameManager
+    return true;
+  }
+
+  // Stub para dados de atualização do tabuleiro
+  getBoardUpdateData(gameId: string) {
+    // Implemente a lógica real ou delegue ao GameManager
+    return { board: null, turn: null, status: 'waiting' };
+  }
+
+  // Stub para dados de fim de jogo
+  getGameOverData(gameId: string, playerId: string, message?: string) {
+    // Implemente a lógica real ou delegue ao GameManager
+    return { winner: null, status: 'ended', playerWinner: null, message };
+  }
+
+  // Stub para desconexão de jogador
+  handlePlayerDisconnect(gameAndPlayerId: any, onTimeout: (gameId: string, playerId: string) => void) {
+    // Implemente a lógica real ou delegue ao GameManager
+    onTimeout(gameAndPlayerId.gameId, gameAndPlayerId.playerId);
+  }
   async createPlayer(name: string, elo: number) {
     const player = await prisma.player.create({
       data: { name, elo },

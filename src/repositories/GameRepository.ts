@@ -1,6 +1,5 @@
 // src/repositories/GameRepository.ts
 import { Game } from "../class/game";
-import { Player } from "../class/Player";
 
 export class GameRepository {
   private games: { [key: string]: Game } = {};
@@ -16,8 +15,8 @@ export class GameRepository {
   }
 
   // Busca um jogo pelo ID
-  public get(gameId: string): Game | null {
-    return this.games[gameId] || null;
+  public get(gameId: string): Game {
+    return this.games[gameId];
   }
 
   // Busca todos os jogos

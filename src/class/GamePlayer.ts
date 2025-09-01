@@ -13,6 +13,14 @@ export class GamePlayer {
     this.isOnline = true;
   }
 
+  setStatus(status: boolean) {
+    this.isOnline = status;
+  }
+
+  getStatus(): boolean {
+    return this.isOnline;
+  }
+
   getPlayerId(): string {
     return this.player.getPlayerId();
   }

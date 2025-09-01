@@ -15,7 +15,7 @@ export class PlayerRepository {
   }
 
   // Busca um jogador pelo ID
-  getById(playerId: string): Player | undefined {
+  getById(playerId: string): Player | null {
     return this.players[playerId];
   }
 

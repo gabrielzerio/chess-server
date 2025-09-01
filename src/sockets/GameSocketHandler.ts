@@ -1,73 +1,88 @@
 // src/sockets/GameSocketHandler.ts
 import { Server, Socket } from "socket.io";
-import { Player } from "../class/Player";
-import { createInitialBoard } from "../utils/boardSetup";
 import { GameService } from "../services/gameService";
+import { GameAndPlayerID } from "../models/types";
 
 export class GameSocketHandler {
-  private gameSvc: GameService;
 
-  constructor(private io: Server, private gameService: GameService) {
-    this.gameSvc = gameService;
-  }
+  constructor(private io: Server, private gameService: GameService) { }
 
   public registerHandlers(socket: Socket) {
+    const { playerId, gameId } = socket;
 
-    // Entrar em jogo
-    socket.on("joinGame", ({ gameId, playerName }: { gameId: string; playerName: string }) => {
-      const player = new Player(playerName);
-      const game = this.gameManager.addPlayerToGame(gameId, player);
-      if (game) {
-        socket.join(gameId);
-        this.io.to(gameId).emit("gameUpdated", game);
-      } else {
-        socket.emit("error", "Não foi possível entrar no jogo.");
+    // JOIN GAME
+    socket.on("joinGame", () => {
+      const joinData = this.gameService.getJoinGameData(gameId, playerId);
+      // if (joinData?.error) {
+      //   socket.emit("error", joinData.error);
+      //   return;
+      // }
+      socket.join(gameId);
+      socket.emit('joinedGame', {
+        board: joinData.board,
+        color: joinData.color,
+        turn: joinData.turn,
+        status: joinData.status
+      });
+      socket.to(gameId).emit('roomJoinMessage', { playerName: joinData.playerName });
+      if (joinData.players?.filter(p => p.isOnline).length === 2) {
+        this.gameService.setGameStatus(gameId, 'playing');
+        this.io.to(gameId).emit('gameUpdate', {
+          board: joinData.board,
+          turn: joinData.turn,
+          status: 'playing',
+          message: 'Game started! Both players are connected.'
+        });
+      } else if (joinData.status === 'waiting') {
+        this.io.to(gameId).emit('gameUpdate', {
+          status: joinData.status,
+          players: joinData.players,
+          message: 'Waiting for opponent to connect.'
+        });
       }
     });
 
-    // Fazer jogada
-    socket.on("makeMove", async ({ gameId, from, to, promotionType }) => {
-      const game = this.gameManager.getGame(gameId);
-      if (!game) {
-        socket.emit("error", "Jogo não encontrado.");
-        return;
-      }
-
-      if (this.gameManager.getGameStatus(gameId) !== "playing") {
+    // MAKE MOVE
+    socket.on("makeMove", async ({ from, to, promotionType }) => {
+      if (this.gameService.getGameStatus(gameId) !== "playing") {
         socket.emit('moveError', { message: 'O jogador inimigo ainda não entrou' });
         return;
       }
-      const piece = game.getSelectedPiece(from);
-      if (!piece) return;
-
-      const player = game.getPlayerByID(socket.playerId);
-      if (!player) {
-        socket.emit('moveError', { message: 'Jogador não encontrado' });
-        return
-      }
-
-      const moveResult = await game.applyMove(player?.player, from, to, promotionType);
-      // console.log(moveResult.message);
-      if (moveResult.success) {
-        this.io.to(socket.gameID).emit('boardUpdate', { board: moveResult.board, turn: moveResult.turn, status: moveResult.status });
+      const moveResult = await this.gameService.makeMove(gameId, playerId, from, to, promotionType);
+      if (moveResult?.success) {
+        const boardUpdate = this.gameService.getBoardUpdateData(gameId);
+        this.io.to(gameId).emit('boardUpdate', boardUpdate);
         if (moveResult.winner) {
-          this.io.to(socket.gameID).emit('gameOver', { winner: game.getTurn() === 'white' ? 'black' : 'white', status: moveResult.status, playerWinner: player?.getPlayerName() });
-          // Considera remover o jogo se ele acabou
-          // this.deleteGame(gameId); // Descomentar se quiser remover automaticamente
+          const gameOverData = this.gameService.getGameOverData(gameId, playerId);
+          this.io.to(gameId).emit('gameOver', gameOverData);
         } else if (moveResult.status === 'checkmate') {
-          // Caso específico de xeque-mate sem winner direto no retorno, trate aqui
-          this.io.to(socket.gameID).emit('gameOver', { winner: game.getTurn() === 'white' ? 'black' : 'white', message: "Cheque mate", status: moveResult.status, playerWinner: player?.getPlayerName() });
-          // this.deleteGame(gameId);
+          const gameOverData = this.gameService.getGameOverData(gameId, playerId, "Cheque mate");
+          this.io.to(gameId).emit('gameOver', gameOverData);
         }
       } else {
         socket.emit('moveError', { message: 'Invalid move.' });
       }
     });
 
-    // Sair do jogo
+    // DISCONNECT
     socket.on("disconnect", () => {
       console.log(`Socket ${socket.id} desconectou`);
-      // aqui você pode usar gameManager.clearReconnectionTimer(playerId) se quiser
+      const gameAndPlayerId: GameAndPlayerID = { gameId, playerId };
+      this.gameService.handlePlayerDisconnect(gameAndPlayerId, (gameId, playerId) => {
+        const gamePlayer = this.gameService.getGamePlayerById(gameId, playerId);
+        if (gamePlayer) {
+          this.gameService.setGameStatus(gameId, 'ended');
+          this.io.to(gameId).emit('gameOver', {
+            status: 'abandoned',
+            playerWinner: gamePlayer.getPlayerName(),
+            message: `${gamePlayer.getPlayerName()} não se reconectou a tempo`
+          });
+        } else {
+          this.gameService.setGameStatus(gameId, 'abandoned');
+          this.io.to(gameId).emit('gameAbandoned', { message: 'Game abandoned due to unresolved disconnection.' });
+        }
+        this.gameService.deleteGame(gameId);
+      });
     });
   }
 }
