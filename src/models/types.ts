@@ -1,7 +1,7 @@
 export type PieceType = "pawn" | "rook" | "knight" | "bishop" | "queen" | "king";
 export type PieceColor = "white" | "black";
 export type ErrorCode = 'GAME_FULL' | 'PLAYER_ALREADY_EXISTS'
-export type GameStatus = 'waiting' | 'playing' | 'ended' | 'checkmate' | 'paused_reconnect' | 'abandoned';
+export type GameStatus = 'first_movement' | 'waiting' | 'playing' | 'ended' | 'checkmate' | 'paused_reconnect' | 'abandoned';
 
 export interface Position {
   row: number;

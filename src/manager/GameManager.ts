@@ -9,7 +9,71 @@ import { GameRepository } from "../repositories/GameRepository";
 import { PlayerRepository } from "../repositories/PlayerRepository";
 
 export class GameManager {
+  private playerTimers: Map<string, { white: number, black: number }> = new Map();
+  private activeTimers: Map<string, NodeJS.Timeout> = new Map();
+  private timerIntervalMs = 1000; // 1 segundo
+
+  startGameTimers(gameId: string, initialTimeMs: number) {
+    this.playerTimers.set(gameId, { white: initialTimeMs, black: initialTimeMs });
+    this.startPlayerTimer(gameId, 'white');
+  }
+
+  startPlayerTimer(gameId: string, color: 'white' | 'black') {
+    this.clearActiveTimer(gameId);
+
+    const interval = setInterval(() => {
+      const timers = this.playerTimers.get(gameId);
+      if (!timers) return;
+
+      timers[color] -= this.timerIntervalMs;
+
+      if (timers[color] <= 0) {
+        this.endGameByTimeout(gameId, color);
+        this.clearActiveTimer(gameId);
+      }
+    }, this.timerIntervalMs);
+
+    this.activeTimers.set(gameId, interval);
+  }
+
+  getPlayerTimer(){
+    return this.playerTimers;
+  }
+  
+  clearActiveTimer(gameId: string) {
+    const timer = this.activeTimers.get(gameId);
+    if (timer) clearInterval(timer);
+    this.activeTimers.delete(gameId);
+  }
+
+  endGameByTimeout(gameId: string, loserColor: 'white' | 'black') {
+    // Lógica para finalizar o jogo e declarar o vencedor
+    // Exemplo: this.setGameStatus(gameId, 'ended');
+    // Emitir evento para sockets, etc.
+  }
+
+  switchTurn(gameId: string, currentColor: 'white' | 'black') {
+    const nextColor = currentColor === 'white' ? 'black' : 'white';
+    this.startPlayerTimer(gameId, nextColor);
+  }
+
+  getTimer(gameId: string): { white: number; black: number } | undefined {
+    const timers = this.playerTimers.get(gameId);
+    return timers;
+  }
+
   // Orquestra uma jogada: recupera o jogo, valida o player e chama applyMove
+  getPossibleMoves(from: Position, gameAndPlayerId: GameAndPlayerID): { normalMoves: Position[], captureMoves: Position[] } | null {
+    const { gameId, playerId } = gameAndPlayerId;
+    const game = this.getGame(gameId)
+    const piece = game.getSelectedPiece(from);
+    if (piece) {
+      const possibleMoves = game.possibleMoves(piece);
+      return possibleMoves;
+    }
+    return null;
+  }
+
   async makeMove(gameId: string, playerId: string, from: Position, to: Position, promotionType?: PieceType) {
     const game = this.getGame(gameId);
     if (!game) {
@@ -63,9 +127,9 @@ export class GameManager {
   // ...existing code...
 
   // Retorna o turno do jogo
-  getGameTurn(gameId: string): string | undefined {
-    const game = this.getGame(gameId);
-    return game ? (game as any).turn : undefined;
+  getGameTurn(gameId: string): PieceColor {
+    const game = this.getGame(gameId).getTurn();
+    return game;
   }
 
   // Retorna o jogador do jogo

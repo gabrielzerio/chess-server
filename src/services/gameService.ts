@@ -5,7 +5,7 @@ import { Game } from '../class/game';
 import { createInitialBoard } from '../utils/boardSetup';
 import { Player } from '../class/Player';
 import { GamePlayer } from '../class/GamePlayer';
-import { GameAndPlayerID, GameStatus, PieceType, Position } from '../models/types';
+import { GameAndPlayerID, GameStatus, PieceColor, PieceType, Position } from '../models/types';
 
 export class GameService {
     private gameManager: GameManager;
@@ -54,7 +54,7 @@ export class GameService {
         return gameId;
     }
 
-    private getPlayer(playerId: string): Player | null {
+    public getPlayer(playerId: string): Player | null {
         const player = this.playerRepository.getById(playerId);
         if (player) {
             return player;
@@ -107,19 +107,22 @@ export class GameService {
         const status = this.gameManager.getGameStatus(gameId);
         const playerName = this.gameManager.getGamePlayerById(playerId, gameId)?.getPlayerName();
         const players = this.gameManager.getPlayers(gameId);
-        return {board, color, turn, status, playerName, players};
+        return { board, color, turn, status, playerName, players };
     }
 
     // Stub para atualizar status do jogo
-    setGameStatus(gameId: string, status: string) {
-        // Implemente a lógica real ou delegue ao GameManager
+    setGameStatus(gameId: string, status: GameStatus) {
+        this.gameManager.setGameStatus(gameId, status);
         return true;
     }
 
     // Stub para dados de atualização do tabuleiro
     getBoardUpdateData(gameId: string) {
-        // Implemente a lógica real ou delegue ao GameManager
-        return { board: null, turn: null, status: 'waiting' };
+        const board = this.gameManager.getBoard(gameId);
+        const turn = this.gameManager.getGameTurn(gameId);
+        const status = this.gameManager.getGameStatus(gameId);
+
+        return { board: board, turn: turn, status: status };
     }
 
     // Stub para dados de fim de jogo
@@ -128,10 +131,9 @@ export class GameService {
         return { winner: null, status: 'ended', playerWinner: null, message };
     }
 
-    // Stub para desconexão de jogador
-    handlePlayerDisconnect(gameAndPlayerId: any, onTimeout: (gameId: string, playerId: string) => void) {
-        // Implemente a lógica real ou delegue ao GameManager
-        onTimeout(gameAndPlayerId.gameId, gameAndPlayerId.playerId);
+    // Delegação correta para reconexão com timer
+    handlePlayerDisconnect(gameAndPlayerId: GameAndPlayerID, onTimeout: (gameId: string, playerId: string) => void, timeoutMs: number = 60000) {
+        this.gameManager.handlePlayerDisconnect(gameAndPlayerId, onTimeout, timeoutMs);
     }
 
     public deleteGame(gameId: string): boolean {
@@ -146,9 +148,41 @@ export class GameService {
         return this.gameManager.getGameStatus(gameId);
     }
 
+    public getPossibleMoves(from: Position, gameAndPlayerId: GameAndPlayerID): { normalMoves: Position[], captureMoves: Position[] } | null {
+        return this.gameManager.getPossibleMoves(from, gameAndPlayerId);
+    }
+
     public makeMove(gameId: string, playerId: string, from: Position, to: Position, promotionType?: PieceType) {
         return this.gameManager.makeMove(gameId, playerId, from, to, promotionType);
     }
+
+    public startTimer(gameId: string) {
+        const turn = this.gameManager.getGameTurn(gameId);
+        this.gameManager.startPlayerTimer(gameId, turn);
+    }
+    public setTimer(gameId: string) {
+        const player = this.gameManager.getGameTurn(gameId);
+        this.gameManager.switchTurn(gameId, player)
+    }
+
+
+
+    getAllTimers() {
+        return this.gameManager.getPlayerTimer();
+    }
+
+    getTimersByGame(gameId: string) {
+        return this.getAllTimers().get(gameId);
+    }
+
+
+
+    public startGameTimers(gameId: string, initialTimeMs: number = 300000) { // 5 minutos padrão
+        this.gameManager.startGameTimers(gameId, initialTimeMs);
+    }
+
+
+
 
     private generateRoomCode(): string {
         // Cria um array com os códigos ASCII para 'a' até 'z' (97-122) e '0' até '9' (48-57)

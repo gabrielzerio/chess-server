@@ -4,7 +4,7 @@ import { GameService } from '../services/gameService';
 // Supondo que você tenha erros customizados
 import { GameFullError, PlayerAlreadyExistsError } from '../models/types';
 
-export class GameRoute {
+export class GameController {
     private gameServiceInstance: GameService;
     constructor(gameServiceInstance: GameService) {
         if (!gameServiceInstance) {

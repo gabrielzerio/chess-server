@@ -67,6 +67,7 @@ const gameRepository = new GameRepository();
 const playerRepository = new PlayerRepository();
 const gameManager = new GameManager(gameRepository, playerRepository);
 const gameService = new GameService(gameManager, gameRepository, playerRepository);
+// const 
 app.use((req, res, next): any => { //middleware de joinGame precisa obrigatoriamente de gameId e nome(mid acima)
   if (req.method === 'POST' && req.path.match('/games/createGame')) {
     const playerId = req.body?.playerId;
@@ -119,7 +120,7 @@ io.of('/').use((socket, next) => {
   const gameId = socket.gameId;
   const gamePlayerId = socket.playerId;
 
-  const game = gameService.gameExists(gameId); //ajustar o problema aqui que não tem playuer ou game se o back-end voltar com o front ligado
+  const game = gameService.gameExists(gameId);
   const gamePlayer = gameService.getGamePlayerById(gameId, gamePlayerId);
 
   if (!game || !gamePlayer) {

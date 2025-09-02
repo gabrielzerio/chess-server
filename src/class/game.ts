@@ -39,6 +39,10 @@ export class Game {
     getStatus(): GameStatus {
         return this.status;
     }
+
+    getTurn(): PieceColor {
+        return this.turn;
+    }
     private board: Board;
     private turn: PieceColor;
     private status: GameStatus;
@@ -81,7 +85,6 @@ export class Game {
     }
 
     getSelectedPiece(from: Position): Piece | null {
-        // Validação de limites
         if (from.row < 0 || from.row >= 8 || from.col < 0 || from.col >= 8) {
             return null;
         }
@@ -226,7 +229,6 @@ export class Game {
         const moved = await this.canMove(piece, to, from, promotionType);
 
         if (!moved) {
-            console.log('tem como dar bo??')
             // Restaura o tabuleiro se o movimento falhou (se o canMove alterou algo temporariamente)
             this.board = originalBoard;
             this.enPassantTarget = originalEnPassantTarget;

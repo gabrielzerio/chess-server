@@ -1,58 +1,66 @@
-import { Router, Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { GameService } from '../services/gameService';
 
-let gameSvc: GameService;
-export function publicRoutersetInstance(gmr: GameService) {
-  gameSvc = gmr;
-}
-
-export const publicRouter = Router();
-
-export function health(req: Request, res: Response) {
-  res.status(200).json({
-    status: 'ok',
-    message: 'API is running and healthy!'
-  });
-}
-
-export function activeGames(req: Request, res: Response) {
-  const games = gameSvc.getAllGames()
-  res.status(200).json(games);
-}
 
 
-export function playerRegister(req: Request, res: Response): void { // se o client enviar Id então verifica-se se está no array, se sim, devolve, se não cria um usuario
-  const playerName = req.query.playerName?.toString();
-  const playerId = req.query.playerId?.toString();
-  let verifyPlayer;
-  if (!playerId && !playerName) {
-    res.status(400).json('Cliente não informou nome nem Id');
-    return;
+export class PublicGameController {
+  private gameSvc: GameService;
+  constructor(gameSvc: GameService) {
+    this.gameSvc = gameSvc;
   }
-  try {
+
+  health = async (req: Request, res: Response) => {
+    res.status(200).json({
+      status: 'ok',
+      message: 'API is running and healthy!'
+    });
+  }
+
+  activeGames = async (req: Request, res: Response) => {
+    const games = this.gameSvc.getAllGames()
+    res.status(200).json(games);
+  }
+
+  getPlayer = async (req: Request, res: Response): Promise<void> => {
+    const playerId = req.query.playerId?.toString();
     if (playerId) {
-      verifyPlayer = gameSvc.playerExists(playerId);
-      verifyPlayer !== null ? res.status(200).json(verifyPlayer) : "";
+      const player = this.gameSvc.getPlayer(playerId);
+      player !== null ? res.status(200).json(player) : res.status(401).json('nenhum player com esse id');
     }
-    else if (playerName) {
-      const player = gameSvc.createPlayer(playerName);
-      // console.log(player);
-      res.status(200).json(player);
-    }
-  } catch (error: any) {
-    res.status(400).json(error.message);
   }
-}
 
-export function players(req: Request, res: Response) {
-  const players = gameSvc.getAllPlayers();
-  res.status(200).json(players);
-}
+  playerRegister = async (req: Request, res: Response): Promise<void> => {
+    const playerName = req.query.playerName?.toString();
+    // const playerId = req.query.playerId?.toString();
 
-export function activePlayers(req: Request, res: Response) {
-  const codeRoom = req.params.codeRoom; // Pega da URL
-  const players = gameSvc.getGamePlayersAtGame(codeRoom);
-  res.status(200).json(players);
-}
+    if (!playerName) {
+      res.status(400).json('Cliente não informou nome nem Id');
+      return;
+    }
 
+    try {
+      if (playerName) {
+        const player = this.gameSvc.createPlayer(playerName);
+        res.status(200).json(player);
+        return;
+      }
+    } catch (error: any) {
+      res.status(400).json(error.message);
+    }
+  }
+
+
+  players = async (req: Request, res: Response) => {
+    const players = this.gameSvc.getAllPlayers();
+    res.status(200).json(players);
+  }
+
+  activePlayers = async (req: Request, res: Response) => {
+    const codeRoom = req.params.codeRoom; // Pega da URL
+    const players = this.gameSvc.getGamePlayersAtGame(codeRoom);
+    res.status(200).json(players);
+  }
+
+
+}
 
