@@ -1,4 +1,4 @@
-import { Position, PieceType, PieceColor, GameStatus, GameAndPlayerID, Board } from "../models/types";
+import { Position, PieceType, PieceColor, GameStatus, GameAndPlayerID, Board, ApplyMoveResult, FENOptions } from "../models/types";
 
 // ...existing code...
 // src/managers/GameManager.ts
@@ -7,18 +7,25 @@ import { Player } from "../class/Player";
 import { GamePlayer } from "../class/GamePlayer";
 import { GameRepository } from "../repositories/GameRepository";
 import { PlayerRepository } from "../repositories/PlayerRepository";
+import { NotationManager } from "./NotationManager";
 
 export class GameManager {
   private playerTimers: Map<string, { white: number, black: number }> = new Map();
   private activeTimers: Map<string, NodeJS.Timeout> = new Map();
   private timerIntervalMs = 1000; // 1 segundo
 
+  constructor(
+    private gameRepository: GameRepository,
+    private playerRepository: PlayerRepository,
+    private notationManager: NotationManager
+  ) { }
+
   startGameTimers(gameId: string, initialTimeMs: number) {
     this.playerTimers.set(gameId, { white: initialTimeMs, black: initialTimeMs });
-    this.startPlayerTimer(gameId, 'white');
+    this.startPlayerTimer(gameId, this.getGame(gameId).getTurn());
   }
 
-  startPlayerTimer(gameId: string, color: 'white' | 'black') {
+  startPlayerTimer(gameId: string, color: PieceColor) {
     this.clearActiveTimer(gameId);
 
     const interval = setInterval(() => {
@@ -36,25 +43,18 @@ export class GameManager {
     this.activeTimers.set(gameId, interval);
   }
 
-  getPlayerTimer(){
-    return this.playerTimers;
-  }
-  
   clearActiveTimer(gameId: string) {
     const timer = this.activeTimers.get(gameId);
     if (timer) clearInterval(timer);
     this.activeTimers.delete(gameId);
   }
 
-  endGameByTimeout(gameId: string, loserColor: 'white' | 'black') {
-    // Lógica para finalizar o jogo e declarar o vencedor
-    // Exemplo: this.setGameStatus(gameId, 'ended');
-    // Emitir evento para sockets, etc.
+  endGameByTimeout(gameId: string, loserColor: PieceColor) {
+
   }
 
-  switchTurn(gameId: string, currentColor: 'white' | 'black') {
-    const nextColor = currentColor === 'white' ? 'black' : 'white';
-    this.startPlayerTimer(gameId, nextColor);
+  switchTurn(gameId: string, currentColor: PieceColor) {
+    this.startPlayerTimer(gameId, this.getGame(gameId).getTurn());
   }
 
   getTimer(gameId: string): { white: number; black: number } | undefined {
@@ -74,7 +74,7 @@ export class GameManager {
     return null;
   }
 
-  async makeMove(gameId: string, playerId: string, from: Position, to: Position, promotionType?: PieceType) {
+  async makeMove(gameId: string, playerId: string, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
     const game = this.getGame(gameId);
     if (!game) {
       return { success: false, message: 'Game not found.' };
@@ -84,8 +84,34 @@ export class GameManager {
       return { success: false, message: 'Player not found.' };
     }
     // Chama a lógica do tabuleiro
-    return await game.applyMove(player, from, to, promotionType);
+    const newState = await game.applyMove(player, from, to, promotionType);
+    if (newState.san) {
+      this.notationManager.addMove(gameId, newState.san);
+      console.log(this.notationManager.getPGN(gameId));
+
+    }
+    return newState;
   }
+
+  // private getFen(gameId: string): string {
+  //   // --- Calcula FEN atualizado ---
+  //   const game = this.getGame(gameId);
+  //   const castlingRights = game.getCastlingRights();
+  //   const turn = game.getTurn();
+  //   const enPassantTarget = game.getEnPassantTarget();
+  //   const { halfMove, fullMove } = game.getFullAndHalfMove();
+  //   const board = game.deserializeBoard();
+  //   const fen = boardToFEN(board, {
+  //     turn: turn,
+  //     castling: castlingRights,
+  //     enPassant: enPassantTarget
+  //       ? `${String.fromCharCode(97 + enPassantTarget.col)}${8 - enPassantTarget.row}`
+  //       : '-',
+  //     halfmove: halfMove,
+  //     fullmove: fullMove
+  //   });
+  //   return fen
+  // }
   // Retorna o status do jogo
   getGameStatus(gameId: string): GameStatus {
     const game = this.getGame(gameId);
@@ -143,10 +169,7 @@ export class GameManager {
   }
   private reconnectionTimers: Map<string, NodeJS.Timeout> = new Map();
 
-  constructor(
-    private gameRepository: GameRepository,
-    private playerRepository: PlayerRepository,
-  ) { }
+
   // Adiciona GamePlayer
   // addGamePlayer(gamePlayer: GamePlayer) {
   //   this.gamePlayerRepository.add(gamePlayer);
@@ -166,13 +189,21 @@ export class GameManager {
     return this.getGame(gameId).getAllGamePlayers();
   }
 
+  getWinner(gameId: string): GamePlayer | undefined {
+    const game = this.getGame(gameId);
+    return game.getWinner();
+  }
+
   // Cria um novo jogo
-  createGame(gameId: string, board: any, player: Player): Game {
+  createGame(gameId: string, board: any): Game {
     const newGame = new Game(board);
     // Adiciona jogador ao repositório
-    this.playerRepository.add(player);
+    // this.playerRepository.add(player);
     // Adiciona jogo ao repositório
-    this.gameRepository.add(gameId, newGame);
+    // this.gameRepository.add(gameId, newGame);
+    // Cria um novo historico
+    // this.notationManager.createGame(gameId);
+    console.log(this.notationManager.getPGN(gameId));
     return newGame;
   }
 
@@ -279,10 +310,6 @@ export class GameManager {
         this.clearReconnectionTimer(playerId);
       }, timeoutMs);
       this.setReconnectionTimerInternal(playerId, timer);
-    }
-    // Remove jogo se todos desconectaram
-    if (this.getActivePlayersCount(gameId) < 1) {
-      this.deleteGame(gameId);
     }
   }
 

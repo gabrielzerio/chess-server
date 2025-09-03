@@ -11,6 +11,7 @@ import { publicGameRouter } from './controllers/publicGameRouter';
 import { GameSocketHandler } from './sockets/GameSocketHandler';
 
 import 'dotenv/config';
+import { NotationManager } from './manager/NotationManager';
 
 // Extend Socket type to include username property
 declare module 'socket.io' {
@@ -65,8 +66,9 @@ app.use(cors(corsOptions));
 // Instancia repositórios e manager
 const gameRepository = new GameRepository();
 const playerRepository = new PlayerRepository();
-const gameManager = new GameManager(gameRepository, playerRepository);
-const gameService = new GameService(gameManager, gameRepository, playerRepository);
+const notationManager = new NotationManager();
+const gameManager = new GameManager(gameRepository, playerRepository, notationManager);
+const gameService = new GameService(gameManager, gameRepository, playerRepository, notationManager);
 // const 
 app.use((req, res, next): any => { //middleware de joinGame precisa obrigatoriamente de gameId e nome(mid acima)
   if (req.method === 'POST' && req.path.match('/games/createGame')) {

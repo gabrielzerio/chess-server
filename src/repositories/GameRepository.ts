@@ -11,6 +11,8 @@ export class GameRepository {
 
   // Remove um jogo do repositório
   public remove(gameId: string): void {
+    console.log(`jogo ${gameId} foi removido!`);
+    
     delete this.games[gameId];
   }
 

@@ -13,15 +13,32 @@ export interface MoveContext {
  * Classe abstrata que representa uma peça de xadrez.
  */
 export abstract class Piece {
-    
+
 
   constructor(
     public readonly type: PieceType,
     public readonly color: PieceColor,
     public position: Position,
     public hasMoved: boolean = false
-  ) {}
+  ) { }
 
+  public getFenChar(): string {
+    let char = '';
+    switch (this.type) {
+      case 'king': char = 'k'; break;
+      case 'queen': char = 'q'; break;
+      case 'rook': char = 'r'; break;
+      case 'bishop': char = 'b'; break;
+      case 'knight': char = 'n'; break;
+      case 'pawn': char = 'p'; break;
+    }
+
+    if (this.color === 'white') {
+      return char.toUpperCase();
+    }
+
+    return char;
+  }
   
   isValidMove(from: Position, to: Position, board: Board, context: MoveContext = {}): boolean {
     return this.isValidPattern(from, to, board, context) && this.isMoveSafe(from, to, board);
@@ -43,7 +60,7 @@ export abstract class Piece {
   protected isMoveSafe(from: Position, to: Position, board: Board): boolean {
     const targetPiece = board[to.row][to.col];
     if (targetPiece && targetPiece.color === this.color) {
-       
+
       return false;
     }
 
@@ -123,7 +140,7 @@ export abstract class Piece {
    */
   showPossibleMoves(board: Board, context: MoveContext = {}): Position[] {
     const possibleMoves: Position[] = [];
-    
+
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 8; c++) {
         const to = { row: r, col: c };
@@ -132,7 +149,7 @@ export abstract class Piece {
         }
       }
     }
-    
+
     return possibleMoves;
   }
 

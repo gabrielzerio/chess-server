@@ -81,16 +81,16 @@ export class GameController {
         }
     }
 
-    deleteGame = (req: Request, res: Response): any => {
-        try {
-            const { gameId } = req.params;
-            const deleted = this.gameServiceInstance.deleteGame(gameId);
-            if (!deleted) {
-                return res.status(404).json({ error: 'Game not found' });
-            }
-            res.json({ success: true, message: `Game ${gameId} deleted.` });
-        } catch (error: any) {
-            res.status(500).json({ error: error.message });
-        }
-    };
+    // deleteGame = (req: Request, res: Response): any => {
+    //     try {
+    //         const { gameId } = req.params;
+    //         const deleted = this.gameServiceInstance.deleteGame(gameId);
+    //         if (!deleted) {
+    //             return res.status(404).json({ error: 'Game not found' });
+    //         }
+    //         res.json({ success: true, message: `Game ${gameId} deleted.` });
+    //     } catch (error: any) {
+    //         res.status(500).json({ error: error.message });
+    //     }
+    // };
 }

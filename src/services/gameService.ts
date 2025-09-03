@@ -1,22 +1,27 @@
 import { GameManager } from '../manager/GameManager';
 import { GameRepository } from '../repositories/GameRepository';
 import { PlayerRepository } from '../repositories/PlayerRepository';
-import { Game } from '../class/game';
 import { createInitialBoard } from '../utils/boardSetup';
 import { Player } from '../class/Player';
 import { GamePlayer } from '../class/GamePlayer';
-import { GameAndPlayerID, GameStatus, PieceColor, PieceType, Position } from '../models/types';
+import { ApplyMoveResult, GameAndPlayerID, GameStatus, IGame, PieceColor, PieceType, Position } from '../models/types';
+import { NotationManager } from '../manager/NotationManager';
 
 export class GameService {
     private gameManager: GameManager;
     private gameRepository: GameRepository;
     private playerRepository: PlayerRepository;
+    private games: Map<string, IGame> = new Map();
+    private notationManager: NotationManager;
 
-    constructor(gameManager: GameManager, gameRepository: GameRepository, playerRepository: PlayerRepository) {
+    constructor(gameManager: GameManager, gameRepository: GameRepository, playerRepository: PlayerRepository, notationManager: NotationManager) {
         this.gameManager = gameManager;
         this.gameRepository = gameRepository;
         this.playerRepository = playerRepository;
+        this.notationManager = notationManager;
     }
+
+
 
     public playerExists(playerId: string): boolean {
         const player = this.gameManager.getPlayerById(playerId);
@@ -47,10 +52,12 @@ export class GameService {
             gameId = this.generateRoomCode();
         } while (this.gameRepository.get(gameId)); // Garante que o ID seja único
 
-        const game = new Game(createInitialBoard());
-
+        const initialBoard = createInitialBoard();
+        const game = this.gameManager.createGame(gameId, initialBoard); //delega ao manager criar uma instancia de game, ele retorna para o service salvar no repo
+        this.notationManager.createGame(gameId);
         this.gameRepository.add(gameId, game);
         console.log(`Game created: ${gameId}`);
+
         return gameId;
     }
 
@@ -93,10 +100,6 @@ export class GameService {
         return this.gameManager.getGamePlayersAtGame(gameId);
     }
 
-    private startReconnectionTimer(gameAndPlayerId: GameAndPlayerID) {
-        this.gameManager.setReconnectionTimer(gameAndPlayerId);
-    }
-
     // Stub para dados de entrada no jogo
     getJoinGameData(gameId: string, playerId: string) {
         // Implemente a lógica real ou delegue ao GameManager
@@ -133,11 +136,33 @@ export class GameService {
 
     // Delegação correta para reconexão com timer
     handlePlayerDisconnect(gameAndPlayerId: GameAndPlayerID, onTimeout: (gameId: string, playerId: string) => void, timeoutMs: number = 60000) {
+        const { gameId, playerId } = gameAndPlayerId;
         this.gameManager.handlePlayerDisconnect(gameAndPlayerId, onTimeout, timeoutMs);
+        const activePlayers = this.gameManager.getActivePlayersCount(gameId);
+
+        if (activePlayers < 1) {
+            this.deleteGame(gameAndPlayerId);
+        }
     }
 
-    public deleteGame(gameId: string): boolean {
+    public deleteGame(gameAndPlayerId: GameAndPlayerID): boolean {
+        const { gameId, playerId } = gameAndPlayerId;
+
+        const player = this.gameManager.getPlayers(gameId);
+        const whitePlayer = player.find(p => p.color == 'white');
+        const blackPlayer = player.find(p => p.color == 'black');
+        const playerWinner = this.gameManager.getWinner(gameId)?.getPlayerName();
+        const pgn = this.notationManager.getPGN(gameId);
+        if (whitePlayer !== undefined && blackPlayer !== undefined && pgn !== null && playerWinner !== undefined) {
+            const infos: IGame = { playerWhite: whitePlayer.getPlayerName(), playerBlack: blackPlayer.getPlayerName(), pgn: pgn, winner: playerWinner, roomCode: gameId };
+            this.saveGame(gameAndPlayerId.gameId, infos)
+        }
         return this.gameManager.deleteGame(gameId);
+    }
+
+    private saveGame(gameId: string, game: IGame) {
+        this.games.set(gameId, game);
+        console.log(this.games.get(gameId));
     }
 
     public getGameTurn(gameId: string) {
@@ -152,8 +177,8 @@ export class GameService {
         return this.gameManager.getPossibleMoves(from, gameAndPlayerId);
     }
 
-    public makeMove(gameId: string, playerId: string, from: Position, to: Position, promotionType?: PieceType) {
-        return this.gameManager.makeMove(gameId, playerId, from, to, promotionType);
+    public async makeMove(gameId: string, playerId: string, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
+        return await this.gameManager.makeMove(gameId, playerId, from, to, promotionType);
     }
 
     public startTimer(gameId: string) {
@@ -165,23 +190,13 @@ export class GameService {
         this.gameManager.switchTurn(gameId, player)
     }
 
-
-
-    getAllTimers() {
-        return this.gameManager.getPlayerTimer();
-    }
-
     getTimersByGame(gameId: string) {
-        return this.getAllTimers().get(gameId);
+        return this.gameManager.getTimer(gameId);
     }
-
-
 
     public startGameTimers(gameId: string, initialTimeMs: number = 300000) { // 5 minutos padrão
         this.gameManager.startGameTimers(gameId, initialTimeMs);
     }
-
-
 
 
     private generateRoomCode(): string {

@@ -13,9 +13,9 @@ export interface EnPassantTarget {
   col: number;
 }
 
-export interface GameAndPlayerID{
-    gameId: string;
-    playerId: string;
+export interface GameAndPlayerID {
+  gameId: string;
+  playerId: string;
 }
 
 export class GameError extends Error {
@@ -40,8 +40,33 @@ export class PlayerAlreadyExistsError extends GameError {
   }
 }
 
+export interface ApplyMoveResult {
+  success: boolean;
+  message?: string;
+  board?: any;
+  turn?: PieceColor;
+  status?: GameStatus;
+  winner?: GamePlayer;
+  isCheck?: boolean;
+}
 
+export interface IGame {
+  playerWhite: string;
+  playerBlack: string;
+  winner: string;
+  roomCode: string;
+  pgn: string;
+}
 
+export interface FENOptions {
+  turn?: PieceColor;           // Quem joga
+  castling?: string;           // Ex.: "KQkq", "KQ", "-"
+  enPassant?: string;          // Ex.: "e3", "-"
+  halfMove?: number;           // Contagem de meios-lances
+  fullMove?: number;           // Número do lance completo
+}
+
+import { GamePlayer } from '../class/GamePlayer';
 // Import da classe base Piece
 import { Piece } from '../class/piece';
 export type Board = (Piece | null)[][];

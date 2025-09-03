@@ -9,6 +9,6 @@ export function privateGameRouter(gameService: GameService): Router{
     router.post('/games/createGame', privateGameRouter.createGame);
     router.post('/games/join', privateGameRouter.joinGame); // Rota mais RESTful
     router.post('/gameExists/:gameId',  privateGameRouter.gameExists);
-    router.delete('/games/:gameId',  privateGameRouter.deleteGame);
+    // router.delete('/games/:gameId',  privateGameRouter.deleteGame);
     return router;
 }

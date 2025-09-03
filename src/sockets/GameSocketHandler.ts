@@ -6,16 +6,18 @@ import { GameAndPlayerID, Position } from "../models/types";
 export class GameSocketHandler {
 
   constructor(private io: Server, private gameService: GameService) { }
-  private timer() {
-
+  private emitTimer(gameId: string) {
+    this.gameService.setTimer(gameId);
+    const timers = this.gameService.getTimersByGame(gameId);
+    this.io.to(gameId).emit("updateTimer", timers);
+  }
+  private startTimer(gameId: string) {
+    this.gameService.startGameTimers(gameId, 900000); // 5 min
+    this.gameService.setGameStatus(gameId, "playing");
   }
   public registerHandlers(socket: Socket) {
     const { playerId, gameId } = socket;
-    setInterval(() => {
-      for (const [gameId, timers] of this.gameService.getAllTimers().entries()) {
-        this.io.to(gameId).emit("updateTimer",  timers );
-      }
-    }, 1000);
+
     // JOIN GAME
     socket.on("joinGame", () => {
       const joinData = this.gameService.getJoinGameData(gameId, playerId);
@@ -32,8 +34,7 @@ export class GameSocketHandler {
       });
       socket.to(gameId).emit('roomJoinMessage', { playerName: joinData.playerName });
       if (joinData.players?.filter(p => p.isOnline).length === 2) {
-        this.gameService.setGameStatus(gameId, 'playing');
-        this.gameService.startGameTimers(gameId, 300000); // 5 min
+        this.gameService.setGameStatus(gameId, 'first_movement');
         this.io.to(gameId).emit('gameUpdate', {
           board: joinData.board,
           turn: joinData.turn,
@@ -50,7 +51,7 @@ export class GameSocketHandler {
     });
 
     socket.on('requestPossibleMoves', async (from: Position, callback) => {
-      if (this.gameService.getGameStatus(gameId) !== "playing") {
+      if (this.gameService.getGameStatus(gameId) === "waiting") {
         socket.emit('moveError', { message: 'O jogador inimigo ainda não entrou' });
         return;
       }
@@ -60,15 +61,19 @@ export class GameSocketHandler {
       }
     })
 
+
     // MAKE MOVE
     socket.on("makeMove", async ({ from, to, promotionType }) => {
-      if (this.gameService.getGameStatus(gameId) !== "playing") {
+      if (this.gameService.getGameStatus(gameId) === "waiting") {
         socket.emit('moveError', { message: 'O jogador inimigo ainda não entrou' });
         return;
       }
+      if (this.gameService.getGameStatus(gameId) === "first_movement") {
+        this.startTimer(gameId);
+      }
       const moveResult = await this.gameService.makeMove(gameId, playerId, from, to, promotionType);
       if (moveResult?.success) {
-        this.gameService.setTimer(gameId);
+        this.emitTimer(gameId);
         const boardUpdate = this.gameService.getBoardUpdateData(gameId);
         this.io.to(gameId).emit('boardUpdate', boardUpdate);
 
@@ -106,7 +111,7 @@ export class GameSocketHandler {
           this.gameService.setGameStatus(gameId, 'abandoned');
           this.io.to(gameId).emit('gameAbandoned', { message: 'Game abandoned due to unresolved disconnection.' });
         }
-        this.gameService.deleteGame(gameId);
+        // this.gameService.deleteGame(gameId);
       },
         gameOverTime  // 60 segundos
       );

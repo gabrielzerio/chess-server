@@ -1,20 +1,9 @@
-import { Board, PieceColor, Position, PieceType, GameStatus, EnPassantTarget } from '../models/types';
-import { Player } from './Player';
+import { Board, PieceColor, Position, PieceType, GameStatus, EnPassantTarget, ApplyMoveResult } from '../models/types';
 import { GamePlayer } from './GamePlayer';
 import { Piece, MoveContext } from './piece';
 import { PieceFactory } from '../models/PieceFactory';
 import { Pawn } from '../models/pieces/Pawn';
 import { King } from '../models/pieces/King';
-
-interface ApplyMoveResult {
-    success: boolean;
-    message?: string;
-    board?: any;
-    turn?: PieceColor;
-    status?: GameStatus;
-    winner?: PieceColor;
-    isCheck?: boolean;
-}
 
 export class Game {
     private gamePlayers: { [playerId: string]: GamePlayer } = {};
@@ -43,10 +32,23 @@ export class Game {
     getTurn(): PieceColor {
         return this.turn;
     }
+
+    getEnPassantTarget(): EnPassantTarget | null {
+        return this.enPassantTarget;
+    }
+
+    getFullAndHalfMove() {
+        const moves = { halfMove: this.halfmoveClock, fullMove: this.fullmoveNumber }
+        return moves;
+    }
+
     private board: Board;
     private turn: PieceColor;
     private status: GameStatus;
     private enPassantTarget: EnPassantTarget | null;
+    private halfmoveClock: number = 0; // reset quando captura ou movimento de peão
+    private fullmoveNumber: number = 1; // começa no 1
+    private winner: GamePlayer | undefined = undefined;
 
     constructor(board: Board) {
         this.board = board;
@@ -62,6 +64,16 @@ export class Game {
 
 
     // --- Métodos de Tabuleiro e Peças (mantidos e aprimorados se necessário) ---
+
+    setWinner(player: GamePlayer) {
+        this.winner = player;
+    }
+    getWinner(): GamePlayer | undefined {
+        if (this.winner) {
+            return this.winner;
+        }
+        return undefined;
+    }
 
     deserializeBoard(): Board {
         return this.board.map((row, rowIdx) =>
@@ -208,7 +220,143 @@ export class Game {
         return this.board.flat().filter((p): p is Piece => p !== null);
     }
 
-    public async applyMove(gamePlayer: GamePlayer, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
+    private wasCapture(
+        piece: Piece,
+        from: Position,
+        to: Position,
+        preMoveBoard: Board = this.board
+    ): { captured: boolean; captureAt?: Position } {
+        const target = preMoveBoard[to.row][to.col];
+
+        // 1) Captura normal
+        if (target && target.color !== piece.color) {
+            return { captured: true, captureAt: { row: to.row, col: to.col } };
+        }
+
+        // 2) En passant
+        const isDiagonal = from.col !== to.col;
+        const destEmpty = !target;
+        const ep =
+            piece.type === "pawn" &&
+            isDiagonal &&
+            destEmpty &&
+            this.enPassantTarget &&
+            this.enPassantTarget.row === to.row &&
+            this.enPassantTarget.col === to.col;
+
+        if (ep) {
+            const capturedRow = piece.color === "white" ? to.row + 1 : to.row - 1;
+            return { captured: true, captureAt: { row: capturedRow, col: to.col } };
+        }
+
+        return { captured: false };
+    }
+    private updateClocksAndEP(piece: Piece, from: Position, to: Position, captureInfo: { captured: boolean }) {
+        // Atualiza halfmoveClock
+        if (piece.type === "pawn" || captureInfo.captured) {
+            this.halfmoveClock = 0;
+        } else {
+            this.halfmoveClock++;
+        }
+
+        // Atualiza fullmoveNumber
+        if (this.turn === "black") {
+            this.fullmoveNumber++;
+        }
+
+        // Atualiza en passant
+        if (piece.type === "pawn" && Math.abs(to.row - from.row) === 2) {
+            const epRow = (from.row + to.row) / 2;
+            this.enPassantTarget = { row: epRow, col: from.col };
+        } else {
+            this.enPassantTarget = null;
+        }
+    }
+    // getInfosToFen(){
+
+    // }
+
+    public getCastlingRights(): string {
+        const rights: string[] = [];
+
+        const pieces = this.getAllFlatPieces();
+
+        const whiteKing = pieces.find(p => p.type === "king" && p.color === "white");
+        const blackKing = pieces.find(p => p.type === "king" && p.color === "black");
+
+        const whiteRooks = pieces.filter(p => p.type === "rook" && p.color === "white");
+        const blackRooks = pieces.filter(p => p.type === "rook" && p.color === "black");
+
+        // White
+        if (whiteKing && !whiteKing.hasMoved) {
+            if (whiteRooks.find(r => r.position.col === 0 && !r.hasMoved)) rights.push("Q");
+            if (whiteRooks.find(r => r.position.col === 7 && !r.hasMoved)) rights.push("K");
+        }
+
+        // Black
+        if (blackKing && !blackKing.hasMoved) {
+            if (blackRooks.find(r => r.position.col === 0 && !r.hasMoved)) rights.push("q");
+            if (blackRooks.find(r => r.position.col === 7 && !r.hasMoved)) rights.push("k");
+        }
+
+        return rights.length ? rights.join('') : "-";
+    }
+
+    public generateSAN(
+        piece: Piece,
+        to: Position,
+        captureInfo: { captured: boolean },
+        promotionType?: PieceType,
+        isCheck?: boolean,
+        isCheckmate?: boolean
+    ): string {
+        // Caso especial: Roque
+        if (piece.type === 'king' && Math.abs(piece.position.col - to.col) === 2) {
+            return to.col === 6 ? 'O-O' : 'O-O-O';
+        }
+
+        let san = '';
+
+        // 1. Nome da peça (exceto peão)
+        if (piece.type !== 'pawn') {
+            san += piece.getFenChar().toUpperCase();
+        }
+
+        // 2. Info de captura
+        if (captureInfo.captured) {
+            // Para peões, a coluna de origem é necessária na captura
+            if (piece.type === 'pawn') {
+                san += String.fromCharCode(97 + piece.position.col);
+            }
+            san += 'x';
+        }
+
+        // 3. Posição de destino
+        san += `${String.fromCharCode(97 + to.col)}${8 - to.row}`;
+
+        // 4. Promoção
+        if (promotionType) {
+            const promotionPiece = PieceFactory.createPiece(promotionType, piece.color, to);
+            san += `=${promotionPiece.getFenChar().toUpperCase()}`;
+        }
+
+        // 5. Xeque ou Xeque-mate
+        if (isCheckmate) {
+            san += '#';
+        } else if (isCheck) {
+            san += '+';
+        }
+
+        return san;
+    }
+
+
+    public async applyMove(
+        gamePlayer: GamePlayer,
+        from: Position,
+        to: Position,
+        promotionType?: PieceType
+    ): Promise<ApplyMoveResult & { san?: string }> { // ALTERADO: O tipo de retorno agora inclui a notação SAN
         if (gamePlayer?.color !== this.turn) {
             return { success: false, message: 'Not your turn or player not found.' };
         }
@@ -218,59 +366,54 @@ export class Game {
             return { success: false, message: 'No piece selected or not your piece.' };
         }
 
-        // Antes de tentar o movimento, verifique se o movimento é legal (não deixa o próprio rei em xeque)
-        // Isso requer uma simulação do movimento e verificar o xeque
-        // const originalBoard = JSON.parse(JSON.stringify(this.board)); // Cópia profunda
-        const originalBoard = this.board // Cópia profunda
-
+        const originalBoard = this.board.map(row => row.slice());
         const originalEnPassantTarget = this.enPassantTarget;
         const originalTurn = this.turn;
+
+        // Precisamos saber se foi captura ANTES de mover a peça
+        const captureInfo = this.wasCapture(piece, from, to, this.board);
 
         const moved = await this.canMove(piece, to, from, promotionType);
 
         if (!moved) {
-            // Restaura o tabuleiro se o movimento falhou (se o canMove alterou algo temporariamente)
-            this.board = originalBoard;
-            this.enPassantTarget = originalEnPassantTarget;
-            this.turn = originalTurn;
             return { success: false, message: 'Invalid move.' };
         }
 
-        // Após o movimento bem-sucedido, verifique se o próprio rei está em xeque
         if (this.isKingInCheck(gamePlayer.color)) {
-            // Se o movimento deixou o próprio rei em xeque, ele é ilegal
-            this.board = originalBoard; // Reverte o tabuleiro
-            this.enPassantTarget = originalEnPassantTarget; // Reverte enPassant
-            this.turn = originalTurn; // Reverte o turno
+            this.board = originalBoard;
+            this.enPassantTarget = originalEnPassantTarget;
+            this.turn = originalTurn;
             return { success: false, message: 'Move leaves your King in check.' };
         }
 
-        // O movimento é válido e não deixou o próprio rei em xeque
-        this.changeTurn(); // Muda o turno para o próximo jogador
-
+        this.changeTurn();
         const isCheckmate = this.verifyCheckMate();
         let winner: PieceColor | undefined;
         let finalStatus = this.status;
         let isCheck = false;
 
         if (isCheckmate) {
-            winner = this.turn === 'white' ? 'black' : 'white'; // O vencedor é o oposto do turno atual
+            winner = this.turn === 'white' ? 'black' : 'white';
             finalStatus = 'ended';
+            this.winner = gamePlayer;
             this.status = finalStatus;
         } else {
-            // Verifica se o próximo jogador (turno atual) está em xeque
             isCheck = this.isKingInCheck(this.turn);
-            // TODO: Implementar lógica de empate (stalemate, 50-move rule, three-fold repetition)
         }
 
+        this.updateClocksAndEP(piece, from, to, captureInfo);
+
+        // NOVO: Gerar a notação SAN para o lance recém-feito
+        const san = this.generateSAN(piece, to, captureInfo, promotionType, isCheck, isCheckmate);
 
         return {
             success: true,
-            board: this.serializeBoard(), // Envia o board serializado
+            board: this.serializeBoard(),
             turn: this.turn,
             status: finalStatus,
-            winner: winner,
-            isCheck: isCheck // Indica se o rei do próximo turno está em xeque
+            winner,
+            isCheck,
+            san: san, // NOVO: Retorna a notação do lance
         };
     }
 }
