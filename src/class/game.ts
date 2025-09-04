@@ -356,7 +356,7 @@ export class Game {
         from: Position,
         to: Position,
         promotionType?: PieceType
-    ): Promise<ApplyMoveResult & { san?: string }> { // ALTERADO: O tipo de retorno agora inclui a notação SAN
+    ): Promise<ApplyMoveResult> { // ALTERADO: O tipo de retorno agora inclui a notação SAN
         if (gamePlayer?.color !== this.turn) {
             return { success: false, message: 'Not your turn or player not found.' };
         }
@@ -388,12 +388,12 @@ export class Game {
 
         this.changeTurn();
         const isCheckmate = this.verifyCheckMate();
-        let winner: PieceColor | undefined;
+        // let winner: PieceColor | undefined;
         let finalStatus = this.status;
         let isCheck = false;
 
         if (isCheckmate) {
-            winner = this.turn === 'white' ? 'black' : 'white';
+            // winner = this.turn === 'white' ? 'black' : 'white';
             finalStatus = 'ended';
             this.winner = gamePlayer;
             this.status = finalStatus;
@@ -411,7 +411,7 @@ export class Game {
             board: this.serializeBoard(),
             turn: this.turn,
             status: finalStatus,
-            winner,
+            winner: this.winner,
             isCheck,
             san: san, // NOVO: Retorna a notação do lance
         };

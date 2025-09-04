@@ -1,28 +1,20 @@
-import { Position, PieceType, PieceColor, GameStatus, GameAndPlayerID, Board, ApplyMoveResult, FENOptions } from "../models/types";
+import { Position, PieceType, PieceColor, GameStatus, Board, ApplyMoveResult, DisconnectResult } from "../models/types";
 
 // ...existing code...
 // src/managers/GameManager.ts
 import { Game } from "../class/game";
 import { Player } from "../class/Player";
 import { GamePlayer } from "../class/GamePlayer";
-import { GameRepository } from "../repositories/GameRepository";
-import { PlayerRepository } from "../repositories/PlayerRepository";
-import { NotationManager } from "./NotationManager";
 
 export class GameManager {
   private playerTimers: Map<string, { white: number, black: number }> = new Map();
   private activeTimers: Map<string, NodeJS.Timeout> = new Map();
   private timerIntervalMs = 1000; // 1 segundo
+  private reconnectionTimers: Map<string, { timer: NodeJS.Timeout, resolve: (value: DisconnectResult | null) => void }> = new Map();
 
-  constructor(
-    private gameRepository: GameRepository,
-    private playerRepository: PlayerRepository,
-    private notationManager: NotationManager
-  ) { }
-
-  startGameTimers(gameId: string, initialTimeMs: number) {
+  startGameTimers(gameId: string, gameTurn: PieceColor, initialTimeMs: number) {
     this.playerTimers.set(gameId, { white: initialTimeMs, black: initialTimeMs });
-    this.startPlayerTimer(gameId, this.getGame(gameId).getTurn());
+    this.startPlayerTimer(gameId, gameTurn);
   }
 
   startPlayerTimer(gameId: string, color: PieceColor) {
@@ -54,7 +46,7 @@ export class GameManager {
   }
 
   switchTurn(gameId: string, currentColor: PieceColor) {
-    this.startPlayerTimer(gameId, this.getGame(gameId).getTurn());
+    this.startPlayerTimer(gameId, currentColor);
   }
 
   getTimer(gameId: string): { white: number; black: number } | undefined {
@@ -63,9 +55,7 @@ export class GameManager {
   }
 
   // Orquestra uma jogada: recupera o jogo, valida o player e chama applyMove
-  getPossibleMoves(from: Position, gameAndPlayerId: GameAndPlayerID): { normalMoves: Position[], captureMoves: Position[] } | null {
-    const { gameId, playerId } = gameAndPlayerId;
-    const game = this.getGame(gameId)
+  getPossibleMoves(game: Game, from: Position): { normalMoves: Position[], captureMoves: Position[] } | null {
     const piece = game.getSelectedPiece(from);
     if (piece) {
       const possibleMoves = game.possibleMoves(piece);
@@ -74,22 +64,16 @@ export class GameManager {
     return null;
   }
 
-  async makeMove(gameId: string, playerId: string, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
-    const game = this.getGame(gameId);
+  async makeMove(game: Game, player: GamePlayer, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
     if (!game) {
       return { success: false, message: 'Game not found.' };
     }
-    const player = this.getGamePlayerById(playerId, gameId);
     if (!player) {
       return { success: false, message: 'Player not found.' };
     }
     // Chama a lógica do tabuleiro
     const newState = await game.applyMove(player, from, to, promotionType);
-    if (newState.san) {
-      this.notationManager.addMove(gameId, newState.san);
-      console.log(this.notationManager.getPGN(gameId));
 
-    }
     return newState;
   }
 
@@ -113,14 +97,12 @@ export class GameManager {
   //   return fen
   // }
   // Retorna o status do jogo
-  getGameStatus(gameId: string): GameStatus {
-    const game = this.getGame(gameId);
+  getGameStatus(game: Game): GameStatus {
     return game?.getStatus();
   }
 
   // Define o status do jogo
-  setGameStatus(gameId: string, status: GameStatus): void {
-    const game = this.getGame(gameId);
+  setGameStatus(game: Game, status: GameStatus): void {
     if (game) {
       game.setStatus(status);
     }
@@ -129,68 +111,38 @@ export class GameManager {
   /**
    * Coloca o jogo em pausa e inicia o timer de reconexão para o player
    */
-  setReconnectionTimer(gameAndPlayerId: GameAndPlayerID, timeoutMs: number = 60000) {
-    const { gameId, playerId } = gameAndPlayerId;
-    const game = this.getGame(gameId);
-    if (!game) return;
-    // Pausa o jogo
-    this.setGameStatus(gameId, 'paused_reconnect');
+  // setReconnectionTimer(game: Game, playerId: string, timeoutMs: number = 60000) {
+  //   if (!game) return;
+  //   // Pausa o jogo
+  //   game.setStatus('paused_reconnect');
 
-    // Cria o timer
-    const timer = setTimeout(() => {
-      console.log('tempo ', timer)
-      // Se o player ainda está offline após o timeout, encerra o jogo
-      const stillOffline = !game.getGamePlayerById(playerId)?.getStatus();
-      if (stillOffline) {
-        this.setGameStatus(gameId, 'ended');
-        // Aqui você pode emitir eventos, remover o jogo, etc.
-      }
-      this.clearReconnectionTimer(playerId);
-    }, timeoutMs);
-    this.setReconnectionTimerInternal(playerId, timer);
-  }
+  //   // Cria o timer
+  //   const timer = setTimeout(() => {
+  //     console.log('tempo ', timer)
+  //     // Se o player ainda está offline após o timeout, encerra o jogo
+  //     const stillOffline = !game.getGamePlayerById(playerId)?.getStatus();
+  //     if (stillOffline) {
+  //       game.setStatus('ended');
+  //       // Aqui você pode emitir eventos, remover o jogo, etc.
+  //     }
+  //     this.clearReconnectionTimer(playerId);
+  //   }, timeoutMs);
+  //   this.setReconnectionTimerInternal(playerId, timer);
+  // }
 
   // ...existing code...
 
   // Retorna o turno do jogo
-  getGameTurn(gameId: string): PieceColor {
-    const game = this.getGame(gameId).getTurn();
-    return game;
+  getGameTurn(game: Game): PieceColor {
+    const turn = game.getTurn();
+    return turn;
   }
 
-  // Retorna o jogador do jogo
-  getGamePlayer(gameId: string, playerId: string): any | undefined {
-    // Supondo que GamePlayer está acessível via PlayerRepository
-    const game = this.getGame(gameId);
-    if (!game) return undefined;
-    // Se gamePlayers estiver no PlayerRepository, buscar por lá
-    // Aqui, apenas retorna o Player
-    return this.getPlayerById(playerId);
-  }
-  private reconnectionTimers: Map<string, NodeJS.Timeout> = new Map();
-
-
-  // Adiciona GamePlayer
-  // addGamePlayer(gamePlayer: GamePlayer) {
-  //   this.gamePlayerRepository.add(gamePlayer);
-  // }
-
-  getGamePlayerById(playerId: string, gameId: string): GamePlayer | null {
-    const game = this.getGame(gameId);
-    if (!game) return null;
-    const gamePlayer = game.getGamePlayerById(playerId);
-
-    return gamePlayer
-
-    // return null;
+  getGamePlayersAtGame(game: Game): GamePlayer[] {
+    return game.getAllGamePlayers();
   }
 
-  getGamePlayersAtGame(gameId: string): GamePlayer[] {
-    return this.getGame(gameId).getAllGamePlayers();
-  }
-
-  getWinner(gameId: string): GamePlayer | undefined {
-    const game = this.getGame(gameId);
+  getWinner(game: Game): GamePlayer | undefined {
     return game.getWinner();
   }
 
@@ -203,13 +155,12 @@ export class GameManager {
     // this.gameRepository.add(gameId, newGame);
     // Cria um novo historico
     // this.notationManager.createGame(gameId);
-    console.log(this.notationManager.getPGN(gameId));
+    // console.log(this.notationManager.getPGN(gameId));
     return newGame;
   }
 
   // Adiciona player em jogo existente
-  addPlayerToGame(gameId: string, player: Player): GamePlayer | null {
-    const game = this.getGame(gameId);
+  addPlayerToGame(game: Game, player: Player): GamePlayer | null {
     if (!game) return null;
     const gamePlayer = new GamePlayer(player, this.setColorForPlayer(game));
     game.addGamePlayer(gamePlayer);
@@ -221,59 +172,23 @@ export class GameManager {
     return qtd == 0 ? "white" : "black";
   }
 
-  // Remove um jogo
-  deleteGame(gameId: string): boolean {
-    this.gameRepository.remove(gameId);
-    return true;
-  }
-
-  // Busca jogo
-  private getGame(gameId: string): Game {
-    return this.gameRepository.get(gameId);
-  }
-  gameExists(gameId: string): boolean {
-    if (this.getGame(gameId)) return true;
+  gameExists(game: Game): boolean {
+    if (game) return true;
     return false;
   }
 
-  getBoard(gameId: string): Board {
-    return this.getGame(gameId).serializeBoard();
+  getBoard(game: Game): Board {
+    return game.serializeBoard();
   }
 
-  // Busca player
-  getPlayerById(playerId: string): Player | null {
-    return this.playerRepository.getById(playerId) ?? null;
-  }
 
-  getPlayerByName(name: string): Player | null {
-    const allPlayers: Player[] = this.playerRepository.getAll();
-    return allPlayers.find((p: Player) => p.getPlayerName() === name) || null;
-  }
 
-  // applyMove(gameId: string, playerId: string, from: Position, to: Position, promotionType?: PieceType) {
-  //   const game = this.getGame(gameId);
-  //   const gamePlayer = game.getGamePlayerById(playerId);
-  //   if (gamePlayer) {
-  //     game.applyMove(gamePlayer, from, to, promotionType);
-  //   }
-  // }
-
-  setPlayerStatus(gameAndPlayerId: GameAndPlayerID, status: boolean) {
-    const { gameId, playerId } = gameAndPlayerId;
-    const game = this.getGame(gameId);
-    game.getGamePlayerById(playerId)?.setStatus(status);
-
-  }
-
-  getPlayerStatus(gameAndPlayerId: GameAndPlayerID): boolean {
-    const { gameId, playerId } = gameAndPlayerId;
-    const game = this.getGame(gameId);
+  getPlayerStatus(game: Game, playerId: string): boolean {
     return game.getGamePlayerById(playerId)?.getStatus();
   }
 
   // Marca o status online/offline do jogador
-  setPlayerOnlineStatus(gameId: string, playerId: string, isOnline: boolean) {
-    const game = this.getGame(gameId);
+  setPlayerOnlineStatus(game: Game, playerId: string, isOnline: boolean) {
     if (!game) return;
     const gamePlayer = game.getGamePlayerById(playerId);
     if (gamePlayer) {
@@ -282,56 +197,69 @@ export class GameManager {
   }
 
   // Retorna número de jogadores online
-  getActivePlayersCount(gameId: string): number {
-    const game = this.getGame(gameId);
+  getPlayersInGame(game: Game): number {
     if (!game) return 0;
     return game.getAllGamePlayers().filter(p => p.getStatus()).length;
   }
 
-  // Retorna todos os jogadores
-  getPlayers(gameId: string) {
-    const game = this.getGame(gameId);
-    if (!game) return [];
-    return game.getAllGamePlayers();
-  }
-
   // Lógica de reconexão: pausa o jogo e inicia timer
-  handlePlayerDisconnect(gameAndPlayerId: GameAndPlayerID, onTimeout: (gameId: string, playerId: string) => void, timeoutMs: number = 60000) {
-    const { gameId, playerId } = gameAndPlayerId;
-    this.setPlayerOnlineStatus(gameId, playerId, false);
+  handlePlayerDisconnect(
+    game: Game,
+    playerId: string,
+    onTimeout: (game: Game, playerId: string) => DisconnectResult,
+    timeoutMs: number = 60000
+  ): Promise<DisconnectResult | null> {
 
-    if (this.getGameStatus(gameId) === 'playing' && this.getActivePlayersCount(gameId) < 2) {
-      this.setGameStatus(gameId, 'paused_reconnect');
-      const timer = setTimeout(() => {
-        // Se ainda está offline após timeout, encerra/abandona
-        if (this.getActivePlayersCount(gameId) < 2 && this.getGameStatus(gameId) === 'paused_reconnect') {
-          onTimeout(gameId, playerId);
-        }
-        this.clearReconnectionTimer(playerId);
-      }, timeoutMs);
-      this.setReconnectionTimerInternal(playerId, timer);
-    }
+    return new Promise((resolve) => {
+      this.setPlayerOnlineStatus(game, playerId, false);
+      const playersOnline = this.getGamePlayersAtGame(game).filter(p => p.isOnline).length;
+
+      if (this.getGameStatus(game) === 'playing' && playersOnline < 2) {
+        this.setGameStatus(game, 'paused_reconnect');
+
+        const timer = setTimeout(() => {
+          // Verifica novamente o estado do jogo e dos jogadores ANTES de executar o callback
+          const gamePlayer = game.getGamePlayerById(playerId);
+
+          // Se o jogador não se reconectou e o jogo ainda está pausado
+          if (gamePlayer && !gamePlayer.isOnline && this.getGameStatus(game) === 'paused_reconnect') {
+            const result = onTimeout(game, playerId); // Executa o callback
+            resolve(result); // Resolve a Promise com o resultado do callback
+          } else {
+            // O jogador se reconectou ou o estado do jogo mudou, então não fazemos nada
+            resolve(null);
+          }
+          this.reconnectionTimers.delete(playerId);
+        }, timeoutMs);
+
+        // Armazena tanto o timer quanto a função resolve para poder cancelá-lo depois
+        this.reconnectionTimers.set(playerId, { timer, resolve });
+      } else {
+        // Se o jogo não estava em andamento ou se ainda há jogadores suficientes, não faz nada.
+        resolve(null);
+      }
+    });
   }
 
-  // Lógica de reconexão: jogador volta
-  handlePlayerReconnect(gameId: string, playerId: string) {
-    this.setPlayerOnlineStatus(gameId, playerId, true);
-    this.clearReconnectionTimer(playerId);
-    // Se ambos online, volta para playing
-    if (this.getActivePlayersCount(gameId) === 2 && this.getGameStatus(gameId) !== 'playing') {
-      this.setGameStatus(gameId, 'playing');
+  // Método para ser chamado quando um jogador se reconecta
+  handlePlayerReconnect(playerId: string) {
+    if (this.reconnectionTimers.has(playerId)) {
+      const { timer, resolve } = this.reconnectionTimers.get(playerId)!;
+      clearTimeout(timer); // Cancela o timeout
+      resolve(null); // Resolve a promise com null, indicando que o jogo não deve acabar
+      this.reconnectionTimers.delete(playerId);
     }
   }
 
   // Lida com reconexão (utilitário interno)
-  private setReconnectionTimerInternal(playerId: string, timeout: NodeJS.Timeout) {
-    this.reconnectionTimers.set(playerId, timeout);
-  }
+  // private setReconnectionTimerInternal(playerId: string, timeout: NodeJS.Timeout) {
+  //   this.reconnectionTimers.set(playerId, timeout);
+  // }
 
-  private clearReconnectionTimer(playerId: string) {
-    const timer = this.reconnectionTimers.get(playerId);
-    if (timer) clearTimeout(timer);
-    this.reconnectionTimers.delete(playerId);
-  }
+  // private clearReconnectionTimer(playerId: string) {
+  //   const timer = this.reconnectionTimers.get(playerId);
+  //   if (timer) clearTimeout(timer);
+  //   this.reconnectionTimers.delete(playerId);
+  // }
   // Removido chave extra
 }

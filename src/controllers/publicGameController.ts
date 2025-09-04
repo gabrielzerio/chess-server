@@ -1,12 +1,16 @@
 import { Request, Response } from 'express';
 import { GameService } from '../services/gameService';
+import { PlayerService } from '../services/playerService';
 
 
 
 export class PublicGameController {
   private gameSvc: GameService;
-  constructor(gameSvc: GameService) {
+  private playerService: PlayerService
+
+  constructor(gameSvc: GameService, playerService: PlayerService) {
     this.gameSvc = gameSvc;
+    this.playerService = playerService;
   }
 
   health = async (req: Request, res: Response) => {
@@ -24,7 +28,7 @@ export class PublicGameController {
   getPlayer = async (req: Request, res: Response): Promise<void> => {
     const playerId = req.query.playerId?.toString();
     if (playerId) {
-      const player = this.gameSvc.getPlayer(playerId);
+      const player = this.playerService.getPlayer(playerId);
       player !== null ? res.status(200).json(player) : res.status(401).json('nenhum player com esse id');
     }
   }
@@ -40,7 +44,7 @@ export class PublicGameController {
 
     try {
       if (playerName) {
-        const player = this.gameSvc.createPlayer(playerName);
+        const player = this.playerService.createPlayer(playerName);
         res.status(200).json(player);
         return;
       }
@@ -48,19 +52,6 @@ export class PublicGameController {
       res.status(400).json(error.message);
     }
   }
-
-
-  players = async (req: Request, res: Response) => {
-    const players = this.gameSvc.getAllPlayers();
-    res.status(200).json(players);
-  }
-
-  activePlayers = async (req: Request, res: Response) => {
-    const codeRoom = req.params.codeRoom; // Pega da URL
-    const players = this.gameSvc.getGamePlayersAtGame(codeRoom);
-    res.status(200).json(players);
-  }
-
 
 }
 

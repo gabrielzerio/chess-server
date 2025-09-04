@@ -12,6 +12,7 @@ import { GameSocketHandler } from './sockets/GameSocketHandler';
 
 import 'dotenv/config';
 import { NotationManager } from './manager/NotationManager';
+import { PlayerService } from './services/playerService';
 
 // Extend Socket type to include username property
 declare module 'socket.io' {
@@ -67,8 +68,9 @@ app.use(cors(corsOptions));
 const gameRepository = new GameRepository();
 const playerRepository = new PlayerRepository();
 const notationManager = new NotationManager();
-const gameManager = new GameManager(gameRepository, playerRepository, notationManager);
-const gameService = new GameService(gameManager, gameRepository, playerRepository, notationManager);
+const gameManager = new GameManager();
+const playerService = new PlayerService(playerRepository);
+const gameService = new GameService(gameManager, gameRepository, notationManager, playerService);
 // const 
 app.use((req, res, next): any => { //middleware de joinGame precisa obrigatoriamente de gameId e nome(mid acima)
   if (req.method === 'POST' && req.path.match('/games/createGame')) {
@@ -88,8 +90,8 @@ app.use((req, res, next): any => {
     if (!gameId) {
       return res.status(400).json({ "error": "Game Id is required to join in game" });
     }
-    const game = gameService.gameExists(gameId.toString());
-    const gamePlayer = gameService.playerExists(playerId);
+    const game = gameService.getGameExists(gameId.toString());
+    const gamePlayer = playerService.getPlayer(playerId);
     if (!game || !gamePlayer) {
       return res.status(401).json({ "error": "valid playerId and gameId are necessary to join a game" });
     }
@@ -103,14 +105,14 @@ const io = new Server(server, {
 });
 
 
-app.use(privateGameRouter(gameService));
-app.use(publicGameRouter(gameService));
+app.use(privateGameRouter(gameService, playerService));
+app.use(publicGameRouter(gameService, playerService));
 
 io.use((socket, next) => { //esse middleware valida somente na conexão
   const { playerId, gameId } = socket.handshake.auth;
   socket.playerId = playerId;
   socket.gameId = gameId;
-  const game = gameService.gameExists(gameId);
+  const game = gameService.getGameExists(gameId);
   const gamePlayer = gameService.getGamePlayerById(gameId, playerId);
   if (!game || !gamePlayer) {
     return next(new Error("Unauthorized"));
@@ -122,7 +124,7 @@ io.of('/').use((socket, next) => {
   const gameId = socket.gameId;
   const gamePlayerId = socket.playerId;
 
-  const game = gameService.gameExists(gameId);
+  const game = gameService.getGameExists(gameId);
   const gamePlayer = gameService.getGamePlayerById(gameId, gamePlayerId);
 
   if (!game || !gamePlayer) {
@@ -132,7 +134,7 @@ io.of('/').use((socket, next) => {
 });
 
 // Integração do GameSocketHandler
-const gameSocketHandler = new GameSocketHandler(io, gameService);
+const gameSocketHandler = new GameSocketHandler(io, gameService, playerService);
 
 io.on('connection', (socket) => {
   gameSocketHandler.registerHandlers(socket);

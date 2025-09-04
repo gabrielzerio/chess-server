@@ -3,33 +3,32 @@ import { GameService } from '../services/gameService';
 
 // Supondo que você tenha erros customizados
 import { GameFullError, PlayerAlreadyExistsError } from '../models/types';
+import { PlayerService } from '../services/playerService';
 
 export class GameController {
-    private gameServiceInstance: GameService;
-    constructor(gameServiceInstance: GameService) {
-        if (!gameServiceInstance) {
+    private gameService: GameService;
+    private playerService: PlayerService;
+
+    constructor(gameService: GameService, playerService: PlayerService) {
+        if (!gameService) {
             throw new Error('gameService not initialized.');
         }
-        this.gameServiceInstance = gameServiceInstance;
+        this.gameService = gameService;
+        this.playerService = playerService;
     }
 
     createGame = async (req: Request, res: Response) => {
         const reqPlayerId = req.body?.playerId;
 
         try {
-            const success = this.gameServiceInstance.playerExists(reqPlayerId);
+            const success = this.playerService.getPlayer(reqPlayerId);
             if (!success) {
                 res.status(401).json("Player doesn't exist");
             }
             else {
-                const gameId = this.gameServiceInstance.createNewGame(reqPlayerId);
+                const gameId = this.gameService.createNewGame(reqPlayerId);
                 res.json({ gameId: gameId });
             }
-            // if (!reqPlayerId) {
-            //     throw new Error('Player id is required.');
-            // }
-            // const player = this.gameServiceInstance.getPlayerById(reqPlayerId);
-            // if (!player) throw new Error('Player not found.');
         } catch (error: any) {
             res.status(404).json({ error: error.message });
         }
@@ -42,7 +41,7 @@ export class GameController {
             return;
         }
         try {
-            const gamePlayer = this.gameServiceInstance.addPlayerInGame(reqPlayerId, gameId);
+            const gamePlayer = this.gameService.addPlayerInGame(reqPlayerId, gameId);
             if (!gamePlayer) throw new Error('Could not add player to game.');
             res.status(200).json({
                 gameId: gameId,
@@ -70,10 +69,6 @@ export class GameController {
             if (!gameId) {
                 throw new Error('Game ID is required.');
             }
-            const vrfGameID = this.gameServiceInstance.gameExists(gameId);
-            // if (vrfGameID && vrfGameID.players?.find?.((p: any) => p.getPlayerId?.() === playerId)) {
-            //     res.status(200).json({ status: "ok" });
-            // } else {
             res.status(404).json({ error: 'Player not found in game.' });
             // }
         } catch (error: any) {
@@ -81,16 +76,4 @@ export class GameController {
         }
     }
 
-    // deleteGame = (req: Request, res: Response): any => {
-    //     try {
-    //         const { gameId } = req.params;
-    //         const deleted = this.gameServiceInstance.deleteGame(gameId);
-    //         if (!deleted) {
-    //             return res.status(404).json({ error: 'Game not found' });
-    //         }
-    //         res.json({ success: true, message: `Game ${gameId} deleted.` });
-    //     } catch (error: any) {
-    //         res.status(500).json({ error: error.message });
-    //     }
-    // };
 }

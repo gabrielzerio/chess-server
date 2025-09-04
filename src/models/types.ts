@@ -1,7 +1,13 @@
+import { GamePlayer } from '../class/GamePlayer';
+// Import da classe base Piece
+import { Piece } from '../class/piece';
+
 export type PieceType = "pawn" | "rook" | "knight" | "bishop" | "queen" | "king";
 export type PieceColor = "white" | "black";
 export type ErrorCode = 'GAME_FULL' | 'PLAYER_ALREADY_EXISTS'
 export type GameStatus = 'first_movement' | 'waiting' | 'playing' | 'ended' | 'checkmate' | 'paused_reconnect' | 'abandoned';
+export type Board = (Piece | null)[][];
+export type DisconnectResult = { status: string; playerWinner: string; message: string; };
 
 export interface Position {
   row: number;
@@ -48,6 +54,7 @@ export interface ApplyMoveResult {
   status?: GameStatus;
   winner?: GamePlayer;
   isCheck?: boolean;
+  san?: string;
 }
 
 export interface IGame {
@@ -65,8 +72,3 @@ export interface FENOptions {
   halfMove?: number;           // Contagem de meios-lances
   fullMove?: number;           // Número do lance completo
 }
-
-import { GamePlayer } from '../class/GamePlayer';
-// Import da classe base Piece
-import { Piece } from '../class/piece';
-export type Board = (Piece | null)[][];

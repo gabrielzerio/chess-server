@@ -4,46 +4,38 @@ import { PlayerRepository } from '../repositories/PlayerRepository';
 import { createInitialBoard } from '../utils/boardSetup';
 import { Player } from '../class/Player';
 import { GamePlayer } from '../class/GamePlayer';
-import { ApplyMoveResult, GameAndPlayerID, GameStatus, IGame, PieceColor, PieceType, Position } from '../models/types';
+import { ApplyMoveResult, DisconnectResult, GameAndPlayerID, GameStatus, IGame, PieceColor, PieceType, Position } from '../models/types';
 import { NotationManager } from '../manager/NotationManager';
+import { Game } from '../class/game';
+import { PlayerService } from './playerService';
 
 export class GameService {
     private gameManager: GameManager;
     private gameRepository: GameRepository;
-    private playerRepository: PlayerRepository;
-    private games: Map<string, IGame> = new Map();
+    // private playerRepository: PlayerRepository;
+    // private games: Map<string, IGame> = new Map();
     private notationManager: NotationManager;
+    private playerService: PlayerService;
 
-    constructor(gameManager: GameManager, gameRepository: GameRepository, playerRepository: PlayerRepository, notationManager: NotationManager) {
+    constructor(gameManager: GameManager, gameRepository: GameRepository, notationManager: NotationManager, playerService: PlayerService) {
         this.gameManager = gameManager;
         this.gameRepository = gameRepository;
-        this.playerRepository = playerRepository;
+        // this.playerRepository = playerRepository;
         this.notationManager = notationManager;
+        this.playerService = playerService;
     }
 
-
-
-    public playerExists(playerId: string): boolean {
-        const player = this.gameManager.getPlayerById(playerId);
-        if (player) {
-            return true;
-        }
-        return false;
+    private getGame(gameId: string): Game {
+        return this.gameRepository.get(gameId);
     }
 
     public getGamePlayerById(gameId: string, playerId: string): GamePlayer | null {
-        const gamePlayer = this.gameManager.getGamePlayerById(playerId, gameId);
+        const game = this.getGame(gameId);
+        const gamePlayer = game.getGamePlayerById(playerId);
         if (gamePlayer) {
             return gamePlayer
         }
         return null;
-    }
-
-
-    public createPlayer(playerName: string): Player {
-        const player = new Player(playerName);
-        this.playerRepository.add(player);
-        return player;
     }
 
     public createNewGame(playerId: string): string {
@@ -61,69 +53,56 @@ export class GameService {
         return gameId;
     }
 
-    public getPlayer(playerId: string): Player | null {
-        const player = this.playerRepository.getById(playerId);
-        if (player) {
-            return player;
-        }
-        return null;
-    }
-
     public addPlayerInGame(playerId: string, gameId: string): GamePlayer | null {
-        const player = this.getPlayer(playerId)
+        const player = this.playerService.getPlayer(playerId);
+        const game = this.getGame(gameId);
+
         if (player) {
-            return this.gameManager.addPlayerToGame(gameId, player);
+            return this.gameManager.addPlayerToGame(game, player);
         }
         return null;
     }
 
-    // private getGame(gameId: string): Game | null {
-    //     const game = this.gameManager.getGame(gameId);
-    //     if (game) {
-    //         return game;
-    //     } else {
-    //         return null;
-    //     }
-    // }
-    public gameExists(gameId: string): boolean {
-        return this.gameManager.gameExists(gameId);
+    public getGameExists(gameId: string): boolean {
+        return !!this.getGame(gameId); // O duplo '!' converte o objeto (ou null) para um booleano
     }
 
     public getAllGames() {
         return this.gameRepository.getAll();
     }
 
-    public getAllPlayers() {
-        return this.playerRepository.getAll()
-    }
-    public getGamePlayersAtGame(gameId: string): GamePlayer[] {
-        return this.gameManager.getGamePlayersAtGame(gameId);
-    }
+    // public getAllPlayers() {
+    //     return this.playerRepository.getAll()
+    // }
 
     // Stub para dados de entrada no jogo
     getJoinGameData(gameId: string, playerId: string) {
         // Implemente a lógica real ou delegue ao GameManager
         // return { error: 'Método não implementado', board: null, color: null, turn: null, status: 'waiting', playerName: '', players: [] };
-        const board = this.gameManager.getBoard(gameId);
-        const color = this.gameManager.getGamePlayerById(playerId, gameId)?.color;
-        const turn = this.gameManager.getGameTurn(gameId);
-        const status = this.gameManager.getGameStatus(gameId);
-        const playerName = this.gameManager.getGamePlayerById(playerId, gameId)?.getPlayerName();
-        const players = this.gameManager.getPlayers(gameId);
+        const game = this.getGame(gameId);
+
+        const board = this.gameManager.getBoard(game);
+        const color = game.getGamePlayerById(playerId).color;
+        const turn = this.gameManager.getGameTurn(game);
+        const status = this.gameManager.getGameStatus(game);
+        const playerName = game.getGamePlayerById(playerId).getPlayerName();
+        const players = this.gameManager.getPlayersInGame(game);
         return { board, color, turn, status, playerName, players };
     }
 
     // Stub para atualizar status do jogo
     setGameStatus(gameId: string, status: GameStatus) {
-        this.gameManager.setGameStatus(gameId, status);
+        const game = this.getGame(gameId);
+        this.gameManager.setGameStatus(game, status);
         return true;
     }
 
     // Stub para dados de atualização do tabuleiro
     getBoardUpdateData(gameId: string) {
-        const board = this.gameManager.getBoard(gameId);
-        const turn = this.gameManager.getGameTurn(gameId);
-        const status = this.gameManager.getGameStatus(gameId);
+        const game = this.getGame(gameId);
+        const board = game.serializeBoard();
+        const turn = game.getTurn();
+        const status = game.getStatus();
 
         return { board: board, turn: turn, status: status };
     }
@@ -134,60 +113,105 @@ export class GameService {
         return { winner: null, status: 'ended', playerWinner: null, message };
     }
 
-    // Delegação correta para reconexão com timer
-    handlePlayerDisconnect(gameAndPlayerId: GameAndPlayerID, onTimeout: (gameId: string, playerId: string) => void, timeoutMs: number = 60000) {
-        const { gameId, playerId } = gameAndPlayerId;
-        this.gameManager.handlePlayerDisconnect(gameAndPlayerId, onTimeout, timeoutMs);
-        const activePlayers = this.gameManager.getActivePlayersCount(gameId);
+    private disconnectCallback(game: Game, disconnectedPlayerId: string): DisconnectResult {
+        const disconnectedPlayer = game.getGamePlayerById(disconnectedPlayerId);
 
-        if (activePlayers < 1) {
-            this.deleteGame(gameAndPlayerId);
-        }
+        // Encontra o jogador que *não* é o que desconectou
+        // const winner = game.getPlayers().find(p => p.getPlayerId() !== disconnectedPlayerId);
+
+        game.setStatus('ended'); // Atualiza o estado do jogo
+
+        return {
+            status: 'abandoned',
+            // Usa o nome do vencedor encontrado, com um fallback.
+            playerWinner: 'o outro jogador',
+            message: `${disconnectedPlayer?.getPlayerName() || 'O jogador'} não se reconectou a tempo`
+        };
     }
 
-    public deleteGame(gameAndPlayerId: GameAndPlayerID): boolean {
-        const { gameId, playerId } = gameAndPlayerId;
+    // Delegação correta para reconexão com timer
+    public async handlePlayerDisconnect(gameAndPlayerId: GameAndPlayerID, timeoutMs: number = 60000): Promise<DisconnectResult | null> {
+        const game = this.getGame(gameAndPlayerId.gameId);
+        if (!game) {
+            return null;
+        }
 
-        const player = this.gameManager.getPlayers(gameId);
+        const { playerId } = gameAndPlayerId;
+
+        // Aguarda a resolução da Promise do GameManager
+        const finalResult = await this.gameManager.handlePlayerDisconnect(
+            game,
+            playerId,
+            // Passa o callback como referência, usando 'bind(this)' para manter o contexto
+            this.disconnectCallback.bind(this),
+            timeoutMs
+        );
+
+        // Se não houver mais jogadores, a sala pode ser limpa aqui
+        const activePlayers = game.countPlayersInGame();
+        if (activePlayers < 1) {
+            console.log('tem que fazer a operacao de deletar jogo')
+            // this.deleteGame(gameAndPlayerId.gameId);
+        }
+
+        return finalResult; // Retorna o resultado (que pode ser o objeto ou null)
+    }
+
+    public deleteGame(gameAndPlayerId: GameAndPlayerID): void {
+        const { gameId, playerId } = gameAndPlayerId;
+        const game = this.getGame(gameId);
+        const player = this.gameManager.getGamePlayersAtGame(game);
         const whitePlayer = player.find(p => p.color == 'white');
         const blackPlayer = player.find(p => p.color == 'black');
-        const playerWinner = this.gameManager.getWinner(gameId)?.getPlayerName();
+        const playerWinner = this.gameManager.getWinner(game)?.getPlayerName();
         const pgn = this.notationManager.getPGN(gameId);
         if (whitePlayer !== undefined && blackPlayer !== undefined && pgn !== null && playerWinner !== undefined) {
             const infos: IGame = { playerWhite: whitePlayer.getPlayerName(), playerBlack: blackPlayer.getPlayerName(), pgn: pgn, winner: playerWinner, roomCode: gameId };
-            this.saveGame(gameAndPlayerId.gameId, infos)
+            // this.saveGame(gameAndPlayerId.gameId, infos)
         }
-        return this.gameManager.deleteGame(gameId);
-    }
-
-    private saveGame(gameId: string, game: IGame) {
-        this.games.set(gameId, game);
-        console.log(this.games.get(gameId));
+        this.gameRepository.remove(gameId);
     }
 
     public getGameTurn(gameId: string) {
-        return this.gameManager.getGameTurn(gameId);
+        const game = this.getGame(gameId);
+        return game.getTurn();
     }
 
     public getGameStatus(gameId: string): GameStatus {
-        return this.gameManager.getGameStatus(gameId);
+        const game = this.getGame(gameId);
+        return game.getStatus();
     }
 
     public getPossibleMoves(from: Position, gameAndPlayerId: GameAndPlayerID): { normalMoves: Position[], captureMoves: Position[] } | null {
-        return this.gameManager.getPossibleMoves(from, gameAndPlayerId);
+        const game = this.getGame(gameAndPlayerId.gameId);
+        return this.gameManager.getPossibleMoves(game, from);
     }
 
-    public async makeMove(gameId: string, playerId: string, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult> {
-        return await this.gameManager.makeMove(gameId, playerId, from, to, promotionType);
+    public async makeMove(gameId: string, playerId: string, from: Position, to: Position, promotionType?: PieceType): Promise<ApplyMoveResult | null> {
+        const game = this.getGame(gameId);
+        const player = this.getGamePlayerById(gameId, playerId);
+        if (player) {
+            const moveResult = await this.gameManager.makeMove(game, player, from, to, promotionType);
+            if (moveResult.san) {
+                this.notationManager.addMove(gameId, moveResult.san);
+            } else {
+                console.log('nenhuma notacao enviada')
+            }
+            return moveResult;
+        }
+        return null;
     }
 
     public startTimer(gameId: string) {
-        const turn = this.gameManager.getGameTurn(gameId);
+        const game = this.getGame(gameId);
+        const turn = this.gameManager.getGameTurn(game);
         this.gameManager.startPlayerTimer(gameId, turn);
     }
+
     public setTimer(gameId: string) {
-        const player = this.gameManager.getGameTurn(gameId);
-        this.gameManager.switchTurn(gameId, player)
+        const game = this.getGame(gameId);
+        const player = this.gameManager.getGameTurn(game);
+        this.gameManager.switchTurn(gameId, game.getTurn())
     }
 
     getTimersByGame(gameId: string) {
@@ -195,7 +219,8 @@ export class GameService {
     }
 
     public startGameTimers(gameId: string, initialTimeMs: number = 300000) { // 5 minutos padrão
-        this.gameManager.startGameTimers(gameId, initialTimeMs);
+        const game = this.getGame(gameId);
+        this.gameManager.startGameTimers(gameId, game.getTurn(), initialTimeMs);
     }
 
 
