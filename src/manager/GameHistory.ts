@@ -1,28 +1,15 @@
-// ALTERADO: A classe foi totalmente reformulada para PGN.
-
+// GameHistory.ts
 export class GameHistory {
-    // NOVO: Armazena tags PGN como [Event "Nome do Evento"]
-    private tags: Map<string, string>;
-
-    // NOVO: Armazena a lista de lances em notação SAN (ex: "e4", "Nf3")
     private moves: string[];
+    private result: string; // "*", "1-0", "0-1" ou "1/2-1/2"
 
     constructor() {
-        this.tags = new Map<string, string>();
         this.moves = [];
-
-        // Adiciona tags padrão que podem ser preenchidas depois
-        this.tags.set("Event", "Casual Game");
-        this.tags.set("Site", "Your Chess App");
-        this.tags.set("Date", new Date().toISOString().split('T')[0].replace(/-/g, '.'));
-        this.tags.set("Round", "1");
-        this.tags.set("White", "Player 1");
-        this.tags.set("Black", "Player 2");
-        this.tags.set("Result", "*"); // * significa "em andamento"
+        this.result = "*"; // padrão: partida em andamento
     }
 
     /**
-     * NOVO: Adiciona um lance à lista de histórico.
+     * Adiciona um lance à lista de histórico.
      * @param sanMove O lance em Standard Algebraic Notation (ex: "Nxf7#")
      */
     addMove(sanMove: string) {
@@ -30,38 +17,26 @@ export class GameHistory {
     }
 
     /**
-     * NOVO: Define ou atualiza o valor de uma tag PGN.
-     * @param tagName O nome da tag (ex: "White", "Result")
-     * @param value O valor da tag (ex: "Magnus Carlsen", "1-0")
+     * Define o resultado da partida.
+     * Exemplos: "1-0" (brancas venceram), "0-1" (pretas venceram), "1/2-1/2" (empate)
      */
-    setTag(tagName: string, value: string) {
-        this.tags.set(tagName, value);
+    setResult(result: string) {
+        this.result = result;
     }
 
     /**
-     * NOVO: Gera a string PGN completa da partida até o momento.
-     * @returns A partida formatada em PGN.
+     * Gera a string PGN com apenas os lances e o resultado.
+     * Exemplo: "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 1-0"
      */
     generatePGN(): string {
-        let pgn = '';
-        // Escreve as tags
-        for (const [key, value] of this.tags.entries()) {
-            pgn += `[${key} "${value}"]\n`;
-        }
-        pgn += '\n';
-
-        // Escreve os lances
         let moveText = '';
         for (let i = 0; i < this.moves.length; i++) {
-            // Adiciona o número do lance antes do movimento das brancas
             if (i % 2 === 0) {
                 moveText += `${(i / 2) + 1}. `;
             }
             moveText += `${this.moves[i]} `;
         }
-        
-        pgn += moveText.trim() + ' ' + this.tags.get("Result");
 
-        return pgn;
+        return moveText.trim() + ' ' + this.result;
     }
 }

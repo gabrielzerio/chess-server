@@ -108,14 +108,23 @@ const io = new Server(server, {
 app.use(privateGameRouter(gameService, playerService));
 app.use(publicGameRouter(gameService, playerService));
 
-io.use((socket, next) => { //esse middleware valida somente na conexão
+io.use((socket, next) => {
   const { playerId, gameId } = socket.handshake.auth;
+
+  if (!playerId || !gameId) {
+    return next(new Error("nenhum playerId ou gameId foi enviado"));
+  }
+
   socket.playerId = playerId;
   socket.gameId = gameId;
-  const game = gameService.getGameExists(gameId);
+
+  if (!gameService.getGameExists(gameId)) {
+    return next(new Error("jogo não encontrado"));
+  }
+
   const gamePlayer = gameService.getGamePlayerById(gameId, playerId);
-  if (!game || !gamePlayer) {
-    return next(new Error("Unauthorized"));
+  if (!gamePlayer) {
+    return next(new Error("jogador não está no jogo!"));
   }
   next();
 });

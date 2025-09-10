@@ -7,27 +7,52 @@ import { Player } from "../class/Player";
 import { GamePlayer } from "../class/GamePlayer";
 
 export class GameManager {
-  private playerTimers: Map<string, { white: number, black: number }> = new Map();
+  private playerTimers: Map<string, Map<string, number>> = new Map();
   private activeTimers: Map<string, NodeJS.Timeout> = new Map();
   private timerIntervalMs = 1000; // 1 segundo
   private reconnectionTimers: Map<string, { timer: NodeJS.Timeout, resolve: (value: DisconnectResult | null) => void }> = new Map();
+  private timerCallbacks: Map<string, (gameId: string, playerId: string) => void> = new Map();
 
-  startGameTimers(gameId: string, gameTurn: PieceColor, initialTimeMs: number) {
-    this.playerTimers.set(gameId, { white: initialTimeMs, black: initialTimeMs });
-    this.startPlayerTimer(gameId, gameTurn);
+  startGameTimers(
+    gameId: string,
+    playerIds: string[],
+    initialTimeMs: number,
+    onTimeout?: (gameId: string, playerId: string) => void
+  ) {
+    const timers = new Map<string, number>();
+    playerIds.forEach(id => timers.set(id, initialTimeMs));
+
+    this.playerTimers.set(gameId, timers);
+
+    if (onTimeout) {
+      this.timerCallbacks.set(gameId, onTimeout);
+    }
+
+    // Começa o timer do primeiro jogador
+    this.startPlayerTimer(gameId, playerIds[0], onTimeout);
   }
 
-  startPlayerTimer(gameId: string, color: PieceColor) {
+  startPlayerTimer(
+    gameId: string,
+    playerId: string,
+    onTimeout?: (gameId: string, playerId: string) => void
+  ) {
     this.clearActiveTimer(gameId);
+    const callback = onTimeout || this.timerCallbacks.get(gameId);
 
     const interval = setInterval(() => {
       const timers = this.playerTimers.get(gameId);
       if (!timers) return;
 
-      timers[color] -= this.timerIntervalMs;
+      const current = timers.get(playerId);
+      if (current === undefined) return;
 
-      if (timers[color] <= 0) {
-        this.endGameByTimeout(gameId, color);
+      timers.set(playerId, current - this.timerIntervalMs);
+
+      if (current <= 0) {
+        if (callback) {
+          callback(gameId, playerId);
+        }
         this.clearActiveTimer(gameId);
       }
     }, this.timerIntervalMs);
@@ -35,24 +60,22 @@ export class GameManager {
     this.activeTimers.set(gameId, interval);
   }
 
+
   clearActiveTimer(gameId: string) {
     const timer = this.activeTimers.get(gameId);
     if (timer) clearInterval(timer);
     this.activeTimers.delete(gameId);
   }
 
-  endGameByTimeout(gameId: string, loserColor: PieceColor) {
 
+  switchTurn(gameId: string, gamePlayerId: string) {
+    this.startPlayerTimer(gameId, gamePlayerId, this.timerCallbacks.get(gameId));
   }
 
-  switchTurn(gameId: string, currentColor: PieceColor) {
-    this.startPlayerTimer(gameId, currentColor);
+  getTimer(gameId: string): Map<string, number> | undefined {
+    return this.playerTimers.get(gameId);
   }
 
-  getTimer(gameId: string): { white: number; black: number } | undefined {
-    const timers = this.playerTimers.get(gameId);
-    return timers;
-  }
 
   // Orquestra uma jogada: recupera o jogo, valida o player e chama applyMove
   getPossibleMoves(game: Game, from: Position): { normalMoves: Position[], captureMoves: Position[] } | null {
@@ -108,6 +131,7 @@ export class GameManager {
     }
   }
 
+
   /**
    * Coloca o jogo em pausa e inicia o timer de reconexão para o player
    */
@@ -145,6 +169,9 @@ export class GameManager {
   getWinner(game: Game): GamePlayer | undefined {
     return game.getWinner();
   }
+  // setWinner(game: Game, gamePlayer: GamePlayer): GamePlayer {
+  //   return game.setWinner(gamePlayer);
+  // }
 
   // Cria um novo jogo
   createGame(gameId: string, board: any): Game {
@@ -182,18 +209,18 @@ export class GameManager {
   }
 
 
-
   getPlayerStatus(game: Game, playerId: string): boolean {
     return game.getGamePlayerById(playerId)?.getStatus();
   }
 
   // Marca o status online/offline do jogador
-  setPlayerOnlineStatus(game: Game, playerId: string, isOnline: boolean) {
-    if (!game) return;
+  setPlayerOnlineStatus(game: Game, playerId: string, isOnline: boolean): GamePlayer | null {
+    if (!game) return null;
     const gamePlayer = game.getGamePlayerById(playerId);
     if (gamePlayer) {
       gamePlayer.setStatus(isOnline);
     }
+    return gamePlayer
   }
 
   // Retorna número de jogadores online
@@ -214,7 +241,7 @@ export class GameManager {
       this.setPlayerOnlineStatus(game, playerId, false);
       const playersOnline = this.getGamePlayersAtGame(game).filter(p => p.isOnline).length;
 
-      if (this.getGameStatus(game) === 'playing' && playersOnline < 2) {
+      if (this.getGameStatus(game) === 'playing' || this.getGameStatus(game) === 'first_movement' && playersOnline < 2) {
         this.setGameStatus(game, 'paused_reconnect');
 
         const timer = setTimeout(() => {

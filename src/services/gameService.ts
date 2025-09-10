@@ -1,8 +1,6 @@
 import { GameManager } from '../manager/GameManager';
 import { GameRepository } from '../repositories/GameRepository';
-import { PlayerRepository } from '../repositories/PlayerRepository';
 import { createInitialBoard } from '../utils/boardSetup';
-import { Player } from '../class/Player';
 import { GamePlayer } from '../class/GamePlayer';
 import { ApplyMoveResult, DisconnectResult, GameAndPlayerID, GameStatus, IGame, PieceColor, PieceType, Position } from '../models/types';
 import { NotationManager } from '../manager/NotationManager';
@@ -30,41 +28,85 @@ export class GameService {
     }
 
     public getGamePlayerById(gameId: string, playerId: string): GamePlayer | null {
-        const game = this.getGame(gameId);
-        const gamePlayer = game.getGamePlayerById(playerId);
-        if (gamePlayer) {
+        // const game = this.getGame(gameId);
+        try {
+            const gamePlayer = this.gameRepository.getGamePlayer(gameId, playerId);
             return gamePlayer
+        } catch (Error) {
+            console.log('Erro: ', Error);
+            return null;
         }
-        return null;
     }
 
     public createNewGame(playerId: string): string {
         let gameId: string;
         do {
             gameId = this.generateRoomCode();
-        } while (this.gameRepository.get(gameId)); // Garante que o ID seja único
+        } while (this.gameRepository.exists(gameId)); // Garante que o ID seja único
 
         const initialBoard = createInitialBoard();
         const game = this.gameManager.createGame(gameId, initialBoard); //delega ao manager criar uma instancia de game, ele retorna para o service salvar no repo
-        this.notationManager.createGame(gameId);
+        this.notationManager.createGame(gameId); //cria um novo notationManager
         this.gameRepository.add(gameId, game);
         console.log(`Game created: ${gameId}`);
 
         return gameId;
     }
 
-    public addPlayerInGame(playerId: string, gameId: string): GamePlayer | null {
-        const player = this.playerService.getPlayer(playerId);
+    public addPlayerInGame(playerId: string, gameId: string): GamePlayer {
+        // 1. Validação inicial: O jogo existe? (Falha Rápida)
+        //    getGame já lança um erro se o jogo não for encontrado, o que é perfeito.
         const game = this.getGame(gameId);
 
-        if (player) {
-            return this.gameManager.addPlayerToGame(game, player);
+        // 2. O jogador já está no jogo? (Caso de Reconexão)
+        const gamePlayerExists = this.gameRepository.gamePlayerExists(gameId, playerId);
+        if (gamePlayerExists) {
+            // A lógica de reconexão é basicamente marcar o jogador como online.
+            console.log('jaexiste?')
+            return this.reconnectPlayerInGame(playerId, gameId);
         }
-        return null;
+
+        // // 3. O jogador não está no jogo. Vamos adicioná-lo.
+        // //    Primeiro, verificamos se há espaço. (Exemplo de lógica)
+        // if (this.gameManager.isGameFull(game)) {
+        //     throw new GameFullError('O jogo já está cheio.');
+        // }
+
+        // // 4. Valida se o player existe no sistema (opcional, mas bom)
+        const player = this.playerService.getPlayer(playerId);
+        if (!player) {
+            throw new Error('Jogador não encontrado no sistema.');
+        }
+
+        // 5. Lógica principal: Adicionar o novo jogador ao jogo.
+        //    Esta era a parte que estava faltando.
+        const newGamePlayer = this.gameManager.addPlayerToGame(game, player);
+        if (newGamePlayer) {
+            // this.notationManager.setGameTag(gameId, tag, newGamePlayer?.getPlayerName());
+        }
+        if (!newGamePlayer) {
+            // Se por algum motivo não foi possível adicionar, lançamos um erro genérico.
+            throw new Error('Falha ao adicionar o jogador ao jogo.');
+        }
+
+        return newGamePlayer;
+    }
+
+    private reconnectPlayerInGame(playerId: string, gameId: string): GamePlayer {
+        const game = this.getGame(gameId);
+        // Delega a lógica de mudança de status para o gameManager
+        const gamePlayer = this.gameManager.setPlayerOnlineStatus(game, playerId, true);
+
+        // A verificação '!= null' era redundante. Se gamePlayer puder ser null,
+        // é melhor lançar um erro, pois uma reconexão não deveria falhar.
+        if (!gamePlayer) {
+            throw new Error(`Falha ao reconectar o jogador ${playerId} no jogo ${gameId}.`);
+        }
+        return gamePlayer;
     }
 
     public getGameExists(gameId: string): boolean {
-        return !!this.getGame(gameId); // O duplo '!' converte o objeto (ou null) para um booleano
+        return this.gameRepository.exists(gameId);
     }
 
     public getAllGames() {
@@ -108,30 +150,35 @@ export class GameService {
     }
 
     // Stub para dados de fim de jogo
-    getGameOverData(gameId: string, playerId: string, message?: string) {
-        // Implemente a lógica real ou delegue ao GameManager
-        return { winner: null, status: 'ended', playerWinner: null, message };
+    getGameOverData(gameId: string, message?: string) {
+        const game = this.getGame(gameId);
+        const winner = game.getWinner()?.getPlayerName();
+        const status = game.getStatus();
+        return { winner: winner, status: status, message };
     }
 
-    private disconnectCallback(game: Game, disconnectedPlayerId: string): DisconnectResult {
+    private disconnectCallback(gameId: string, disconnectedPlayerId: string): DisconnectResult {
+        const game = this.getGame(gameId);
         const disconnectedPlayer = game.getGamePlayerById(disconnectedPlayerId);
 
         // Encontra o jogador que *não* é o que desconectou
-        // const winner = game.getPlayers().find(p => p.getPlayerId() !== disconnectedPlayerId);
+        const winner = game.getAllGamePlayers().find(p => p.getPlayerId() !== disconnectedPlayerId);
 
-        game.setStatus('ended'); // Atualiza o estado do jogo
+        this.setWinner(gameId, winner, 'abandoned');
+        // game.setStatus('ended'); // Atualiza o estado do jogo
 
         return {
             status: 'abandoned',
             // Usa o nome do vencedor encontrado, com um fallback.
-            playerWinner: 'o outro jogador',
+            playerWinner: winner?.getPlayerName() || 'outro jogador',
             message: `${disconnectedPlayer?.getPlayerName() || 'O jogador'} não se reconectou a tempo`
         };
     }
 
     // Delegação correta para reconexão com timer
-    public async handlePlayerDisconnect(gameAndPlayerId: GameAndPlayerID, timeoutMs: number = 60000): Promise<DisconnectResult | null> {
+    public async handlePlayerDisconnect(gameAndPlayerId: GameAndPlayerID, timeoutMs: number = 6000): Promise<DisconnectResult | null> {
         const game = this.getGame(gameAndPlayerId.gameId);
+        const gameId = gameAndPlayerId.gameId;
         if (!game) {
             return null;
         }
@@ -143,35 +190,44 @@ export class GameService {
             game,
             playerId,
             // Passa o callback como referência, usando 'bind(this)' para manter o contexto
-            this.disconnectCallback.bind(this),
+            () => this.disconnectCallback(gameId, playerId),
             timeoutMs
         );
 
         // Se não houver mais jogadores, a sala pode ser limpa aqui
-        const activePlayers = game.countPlayersInGame();
-        if (activePlayers < 1) {
-            console.log('tem que fazer a operacao de deletar jogo')
-            // this.deleteGame(gameAndPlayerId.gameId);
+        const activePlayers = game.getAllGamePlayers();
+        const online = activePlayers.filter(p => p.isOnline);
+        // this.gameManager.setWinner(game, online);
+        // await this.saveGame(gameAndPlayerId.gameId);
+        if (online.length < 1) {
+            // const pgn = this.notationManager.getPGN(gameAndPlayerId.gameId);
+            // console.log(pgn);
+
+            // console.log('tem que fazer a operacao de deletar jogo')
+            this.gameRepository.remove(gameAndPlayerId.gameId);
         }
 
         return finalResult; // Retorna o resultado (que pode ser o objeto ou null)
     }
 
-    public deleteGame(gameAndPlayerId: GameAndPlayerID): void {
-        const { gameId, playerId } = gameAndPlayerId;
+    private async saveGame(gameId: string) {
         const game = this.getGame(gameId);
-        const player = this.gameManager.getGamePlayersAtGame(game);
-        const whitePlayer = player.find(p => p.color == 'white');
-        const blackPlayer = player.find(p => p.color == 'black');
+        const players = this.gameManager.getGamePlayersAtGame(game);
+        const whitePlayer = players.find(p => p.color == 'white');
+        const blackPlayer = players.find(p => p.color == 'black');
         const playerWinner = this.gameManager.getWinner(game)?.getPlayerName();
         const pgn = this.notationManager.getPGN(gameId);
+        // console.log(pgn);
         if (whitePlayer !== undefined && blackPlayer !== undefined && pgn !== null && playerWinner !== undefined) {
-            const infos: IGame = { playerWhite: whitePlayer.getPlayerName(), playerBlack: blackPlayer.getPlayerName(), pgn: pgn, winner: playerWinner, roomCode: gameId };
-            // this.saveGame(gameAndPlayerId.gameId, infos)
+            // const infos: IGame = { playerWhite: whitePlayer.getPlayerName(), playerBlack: blackPlayer.getPlayerName(), pgn: pgn, winner: playerWinner, roomCode: gameId };
+            await this.gameRepository.saveGameToDB(
+                whitePlayer.getPlayerName(),
+                blackPlayer.getPlayerName(),
+                playerWinner,
+                pgn
+            );
         }
-        this.gameRepository.remove(gameId);
     }
-
     public getGameTurn(gameId: string) {
         const game = this.getGame(gameId);
         return game.getTurn();
@@ -197,31 +253,97 @@ export class GameService {
             } else {
                 console.log('nenhuma notacao enviada')
             }
+            if (moveResult.winner) {
+                this.setWinner(gameId, moveResult.winner); // só usa para setar result no notationmanager
+                // const result = moveResult.winner.color === 'white' ? '1-0' : '0-1';
+                // this.notationManager.setResult(gameId, result)
+            }
             return moveResult;
         }
         return null;
     }
 
-    public startTimer(gameId: string) {
-        const game = this.getGame(gameId);
-        const turn = this.gameManager.getGameTurn(game);
-        this.gameManager.startPlayerTimer(gameId, turn);
+
+
+    async setWinner(gameId: string, gamePlayer?: GamePlayer, gameStatus?: GameStatus) {
+        if (gamePlayer) {
+            const result = gamePlayer.color === 'white' ? '1-0' : '0-1';
+            this.notationManager.setResult(gameId, result);
+            const game = this.getGame(gameId);
+            game.setWinner(gamePlayer);
+
+            if (gameStatus) {
+                game.setStatus(gameStatus);
+            }
+
+            if (gameStatus === 'ended') {
+                await this.saveGame(gameId);
+            }
+        }
     }
 
-    public setTimer(gameId: string) {
+
+    public setTimer(gameId: string, gamePlayerId: string) {
         const game = this.getGame(gameId);
-        const player = this.gameManager.getGameTurn(game);
-        this.gameManager.switchTurn(gameId, game.getTurn())
+
+        // pega todos os jogadores
+        const players = this.gameManager.getGamePlayersAtGame(game);
+
+        // descobre o próximo (quem NÃO é o atual)
+        const nextPlayer = players.find(p => p.getPlayerId() !== gamePlayerId);
+
+        if (nextPlayer) {
+            this.gameManager.switchTurn(gameId, nextPlayer.getPlayerId());
+        }
     }
 
-    getTimersByGame(gameId: string) {
-        return this.gameManager.getTimer(gameId);
+
+
+    timerCallback(gameId: string, playerId: string) {
+        const game = this.getGame(gameId);
+        const opponent = this.gameManager.getGamePlayersAtGame(game).find(p => p.getPlayerId() !== playerId);
+
+        if (opponent) {
+            this.setWinner(gameId, opponent, 'ended');
+        }
     }
 
-    public startGameTimers(gameId: string, initialTimeMs: number = 300000) { // 5 minutos padrão
+    public startGameTimers(gameId: string, initialTimeMs: number = 300000): Promise<{ gameId: string, playerId: string }> {
         const game = this.getGame(gameId);
-        this.gameManager.startGameTimers(gameId, game.getTurn(), initialTimeMs);
+        const players = this.gameManager.getGamePlayersAtGame(game);
+        const playerIds = players.map((p) => {
+            return p.getPlayerId();
+        });
+        return new Promise((resolve) => {
+            this.gameManager.startGameTimers(
+                gameId,
+                playerIds,
+                initialTimeMs,
+                (gameId, playerId) => {
+                    this.timerCallback(gameId, playerId);
+                    resolve({ gameId, playerId });
+                }
+            );
+
+        });
+
     }
+
+    getTimersByGame(gameId: string): { white: number; black: number } | undefined {
+        const game = this.getGame(gameId);
+        const timers = this.gameManager.getTimer(gameId);
+
+        if (!timers || !game) return undefined;
+
+        const result: { white: number; black: number } = { white: 0, black: 0 };
+
+        for (const player of game.getAllGamePlayers()) {
+            const time = timers.get(player.getPlayerId()) ?? 0;
+            result[player.color] = time;
+        }
+        return result;
+    }
+
 
 
     private generateRoomCode(): string {

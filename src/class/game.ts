@@ -8,6 +8,9 @@ import { King } from '../models/pieces/King';
 export class Game {
     private gamePlayers: { [playerId: string]: GamePlayer } = {};
     addGamePlayer(gamePlayer: GamePlayer) {
+        if (this.countPlayersInGame() >= 2) {
+            throw Error("O numero maximo de jogadores para esse jogo foi atingido");
+        }
         this.gamePlayers[gamePlayer.getPlayerId()] = gamePlayer;
     }
 

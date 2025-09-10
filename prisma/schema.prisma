@@ -20,7 +20,7 @@ model Player {
 
 model Game {
   id            Int      @id @default(autoincrement())
-  roomCode      String
+  pgn      String
 
   playerWhite   Player   @relation("WhitePlayer", fields: [playerWhiteId], references: [id])
   playerWhiteId Int

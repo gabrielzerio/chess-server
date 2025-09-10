@@ -7,14 +7,24 @@ import { PlayerService } from "../services/playerService";
 export class GameSocketHandler {
 
   constructor(private io: Server, private gameService: GameService, private playerService: PlayerService) { }
-  private emitTimer(gameId: string) {
-    this.gameService.setTimer(gameId);
+  private emitTimer(gameId: string, gamePlayerId: string) {
+    this.gameService.setTimer(gameId, gamePlayerId);
     const timers = this.gameService.getTimersByGame(gameId);
     this.io.to(gameId).emit("updateTimer", timers);
   }
-  private startTimer(gameId: string) {
-    this.gameService.startGameTimers(gameId, 900000); // 5 min
-    this.gameService.setGameStatus(gameId, "playing");
+  private async startTimer(gameId: string) {
+    if (this.gameService.getGameStatus(gameId) === "first_movement") {
+      this.gameService.setGameStatus(gameId, 'playing');
+    }
+    const finish = await this.gameService.startGameTimers(gameId, 10000); // 5 min
+    if (finish) {
+      this.emitGameOver(gameId, 'O tempo de ');
+    }
+
+  }
+  private emitGameOver(gameId: string, message?: string) {
+    const gameOver = this.gameService.getGameOverData(gameId);
+    this.io.to(gameId).emit('gameOver', gameOver, message);
   }
   public registerHandlers(socket: Socket) {
     const { playerId, gameId } = socket;
@@ -69,21 +79,19 @@ export class GameSocketHandler {
         socket.emit('moveError', { message: 'O jogador inimigo ainda não entrou' });
         return;
       }
-      if (this.gameService.getGameStatus(gameId) === "first_movement") {
-        this.startTimer(gameId);
-      }
       const moveResult = await this.gameService.makeMove(gameId, playerId, from, to, promotionType);
       if (moveResult?.success) {
-        this.emitTimer(gameId);
+        if (this.gameService.getGameStatus(gameId) === "first_movement") {
+          this.startTimer(gameId);
+        }
+        this.emitTimer(gameId, playerId);
         const boardUpdate = this.gameService.getBoardUpdateData(gameId);
         this.io.to(gameId).emit('boardUpdate', boardUpdate);
 
         if (moveResult.winner) {
-          const gameOverData = this.gameService.getGameOverData(gameId, playerId);
-          this.io.to(gameId).emit('gameOver', gameOverData);
+          this.emitGameOver(gameId);
         } else if (moveResult.status === 'checkmate') {
-          const gameOverData = this.gameService.getGameOverData(gameId, playerId, "Cheque mate");
-          this.io.to(gameId).emit('gameOver', gameOverData);
+          this.emitGameOver(gameId);
         }
       } else {
         socket.emit('moveError', { message: 'Invalid move.' });
@@ -107,21 +115,29 @@ export class GameSocketHandler {
       this.io.to(gameId).emit('gamePausedForReconnect', {
         disconnectedPlayerName: gamePlayer?.getPlayerName(),
         gameStatus: 'paused_reconnect',
-        timeLeft: 60000 // Envia o tempo total em segundos
+        timeLeft: 600000 // Envia o tempo total em segundos
       });
 
       // 2. Chama o serviço e AGUARDA (await) o resultado do timeout
       const gameAndPlayerId: GameAndPlayerID = { gameId, playerId };
-      const gameOverData = await this.gameService.handlePlayerDisconnect(gameAndPlayerId);
+      try {
+        const gameOverData = await this.gameService.handlePlayerDisconnect(gameAndPlayerId);
+        if (gameOverData) {
+          console.log('Tempo de reconexão esgotado. Encerrando o jogo.');
+          this.io.to(gameId).emit('gameOver', gameOverData);
+        } else {
+          // Se for nulo, o jogador se reconectou a tempo ou o jogo terminou por outro motivo
+          console.log('O jogador se reconectou ou a pausa foi resolvida.');
+        }
+        // this.io.disconnectSockets();
+
+      }
+      catch (error) {
+        console.log(error);
+      }
 
       // 3. Se gameOverData não for nulo, significa que o tempo esgotou e o jogo acabou
-      if (gameOverData) {
-        console.log('Tempo de reconexão esgotado. Encerrando o jogo.');
-        this.io.to(gameId).emit('gameOver', gameOverData);
-      } else {
-        // Se for nulo, o jogador se reconectou a tempo ou o jogo terminou por outro motivo
-        console.log('O jogador se reconectou ou a pausa foi resolvida.');
-      }
+
     });
   }
 }

@@ -36,7 +36,6 @@ export class PublicGameController {
   playerRegister = async (req: Request, res: Response): Promise<void> => {
     const playerName = req.query.playerName?.toString();
     // const playerId = req.query.playerId?.toString();
-
     if (!playerName) {
       res.status(400).json('Cliente não informou nome nem Id');
       return;
