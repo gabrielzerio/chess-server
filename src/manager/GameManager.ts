@@ -12,7 +12,6 @@ export class GameManager {
   private timerIntervalMs = 1000; // 1 segundo
   private reconnectionTimers: Map<string, { timer: NodeJS.Timeout, resolve: (value: DisconnectResult | null) => void }> = new Map();
   private timerCallbacks: Map<string, (gameId: string, playerId: string) => void> = new Map();
-
   startGameTimers(
     gameId: string,
     playerIds: string[],
@@ -233,15 +232,15 @@ export class GameManager {
   handlePlayerDisconnect(
     game: Game,
     playerId: string,
-    onTimeout: (game: Game, playerId: string) => DisconnectResult,
-    timeoutMs: number = 60000
+    onTimeout: (game: Game, playerId: string) => DisconnectResult | null,
+    timeoutMs: number
   ): Promise<DisconnectResult | null> {
 
     return new Promise((resolve) => {
       this.setPlayerOnlineStatus(game, playerId, false);
       const playersOnline = this.getGamePlayersAtGame(game).filter(p => p.isOnline).length;
 
-      if (this.getGameStatus(game) === 'playing' || this.getGameStatus(game) === 'first_movement' && playersOnline < 2) {
+      if ((this.getGameStatus(game) === 'playing' || this.getGameStatus(game) === 'first_movement') && playersOnline < 2) {
         this.setGameStatus(game, 'paused_reconnect');
 
         const timer = setTimeout(() => {

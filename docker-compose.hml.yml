@@ -8,12 +8,12 @@ services:
       NODE_ENV: "hml"
       NOME_CONTAINER: "chess-api-local"
       DATABASE_URL: "mysql://chessuser:chesspass@mariadb:3306/chessdb"
-      REDIS_URL: "redis://:Redis2019!@redis:6379"
+      # REDIS_URL: "redis://:Redis2019!@redis:6379"
     depends_on:
       mariadb:
         condition: service_healthy
-      redis:
-        condition: service_healthy
+      # redis:
+      #   condition: service_healthy
     ports:
       - "3001:3001"
     networks:
@@ -37,15 +37,15 @@ services:
     volumes:
       - mariadb_data:/var/lib/mariadb
 
-  redis:
-    image: redis
-    container_name: chess-redis
-    command: redis-server --requirepass Redis2019!
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a Redis2019! ping | grep PONG"]
-      interval: 1s
-      timeout: 3s
-      retries: 5
+  # redis:
+  #   image: redis
+  #   container_name: chess-redis
+  #   command: redis-server --requirepass Redis2019!
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "redis-cli -a Redis2019! ping | grep PONG"]
+  #     interval: 1s
+  #     timeout: 3s
+  #     retries: 5
 
 networks:
   default:

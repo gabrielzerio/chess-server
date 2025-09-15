@@ -103,30 +103,53 @@ export class GameRepository {
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------//
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------//
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------//
-  async findOrCreatePlayer(name: string, elo = 1200) {
-    let player = await prisma.player.findFirst({
-      where: { name },
-    });
+  /**
+   * Encontra um jogador pelo seu ID do jogo (gamePlayerId) ou o cria se não existir.
+   * @param gamePlayerId O ID único do jogador vindo do seu jogo.
+   * @param data Os dados do jogador, como nome e elo inicial, caso precise ser criado.
+   * @returns O jogador encontrado ou recém-criado.
+   */
+  public async findOrCreatePlayer(
+    gamePlayerId: string,
+    data: { name: string; elo?: number }
+  ) {
+    const defaultElo = 1200;
 
-    if (!player) {
-      player = await prisma.player.create({
-        data: { name, elo },
-      });
-    }
+    const player = await prisma.player.upsert({
+      // 1. Cláusula de busca: onde o Prisma vai procurar
+      where: {
+        gamePlayerId: gamePlayerId, // Busca pelo campo único que definimos
+      },
+      // 2. O que fazer se encontrar o jogador (pode ser usado para atualizar dados)
+      update: {
+        // Se você quiser, por exemplo, atualizar o nome do jogador sempre que essa função for chamada:
+        // name: data.name,
+        // Se não quiser atualizar nada, basta deixar um objeto vazio.
+      },
+      // 3. O que fazer se NÃO encontrar: os dados para criar o novo jogador
+      create: {
+        gamePlayerId: gamePlayerId,
+        name: data.name,
+        elo: data.elo ?? defaultElo, // Usa o elo fornecido ou o padrão (1200)
+      },
+    });
 
     return player;
   }
 
   async saveGameToDB(
+    whitePlayerId: string,
     whitePlayerName: string,
+    blackPlayerId: string,
     blackPlayerName: string,
+    winnerId: string,
     winnerName: string,
     pgn: string
   ) {
     // cria ou pega jogadores existentes
-    const whitePlayer = await this.findOrCreatePlayer(whitePlayerName);
-    const blackPlayer = await this.findOrCreatePlayer(blackPlayerName);
-    const winnerPlayer = await this.findOrCreatePlayer(winnerName);
+    const whitePlayer = await this.findOrCreatePlayer(whitePlayerId, { name: whitePlayerName });
+    const blackPlayer = await this.findOrCreatePlayer(blackPlayerId, { name: blackPlayerName });
+    const winnerPlayer = await this.findOrCreatePlayer(winnerId, { name: winnerName });
     // salva o jogo
     const game = await prisma.game.create({
       data: {

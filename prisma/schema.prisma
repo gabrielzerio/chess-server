@@ -9,9 +9,10 @@ datasource db {
 }
 
 model Player {
-  id     Int     @id @default(autoincrement())
-  name   String
-  elo    Int
+  id           Int    @id @default(autoincrement())
+  gamePlayerId String @unique
+  name         String
+  elo          Int
 
   whiteGames Game[] @relation("WhitePlayer")
   blackGames Game[] @relation("BlackPlayer")

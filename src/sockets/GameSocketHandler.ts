@@ -3,10 +3,13 @@ import { Server, Socket } from "socket.io";
 import { GameService } from "../services/gameService";
 import { GameAndPlayerID, Position } from "../models/types";
 import { PlayerService } from "../services/playerService";
+import process from "process";
 
 export class GameSocketHandler {
 
   constructor(private io: Server, private gameService: GameService, private playerService: PlayerService) { }
+  private rec_timer = Number(process.env.RECONNECTION_TIMER);
+
   private emitTimer(gameId: string, gamePlayerId: string) {
     this.gameService.setTimer(gameId, gamePlayerId);
     const timers = this.gameService.getTimersByGame(gameId);
@@ -16,15 +19,20 @@ export class GameSocketHandler {
     if (this.gameService.getGameStatus(gameId) === "first_movement") {
       this.gameService.setGameStatus(gameId, 'playing');
     }
-    const finish = await this.gameService.startGameTimers(gameId, 10000); // 5 min
+    const finish = await this.gameService.startGameTimers(gameId, 900000); // 15 min
     if (finish) {
-      this.emitGameOver(gameId, 'O tempo de ');
+      const player = this.gameService.getGamePlayerById(finish.gameId, finish.playerId)?.getPlayerName();
+      this.emitGameOver(gameId, `O tempo de ${player} acabou`);
     }
 
   }
   private emitGameOver(gameId: string, message?: string) {
-    const gameOver = this.gameService.getGameOverData(gameId);
-    this.io.to(gameId).emit('gameOver', gameOver, message);
+    if(this.gameService.getGameExists(gameId)){
+      const gameOver = this.gameService.getGameOverData(gameId, message);
+      this.io.to(gameId).emit('gameOver', gameOver);
+    }else{
+      console.log('jogo ja foi deletado!');
+    }
   }
   public registerHandlers(socket: Socket) {
     const { playerId, gameId } = socket;
@@ -89,9 +97,9 @@ export class GameSocketHandler {
         this.io.to(gameId).emit('boardUpdate', boardUpdate);
 
         if (moveResult.winner) {
-          this.emitGameOver(gameId);
+          this.emitGameOver(gameId, "Venceu por cheque mate");
         } else if (moveResult.status === 'checkmate') {
-          this.emitGameOver(gameId);
+          this.emitGameOver(gameId, "Venceu por cheque mate");
         }
       } else {
         socket.emit('moveError', { message: 'Invalid move.' });
@@ -104,24 +112,27 @@ export class GameSocketHandler {
     // ... imports
     socket.on("disconnect", async () => { // O handler do evento agora é ASYNC
       console.log(`Socket ${socket.id} desconectou`);
-
+      if (!this.gameService.getGameExists(gameId)) {
+        return null;
+      }
       // if (!gameId || !playerId) {
       //   return; // Sai se não houver informações do jogo/jogador
       // }
 
-      const gamePlayer = this.gameService.getGamePlayerById(gameId, playerId);
+      const gamePlayer = this.playerService.getPlayer(playerId);
 
       // 1. Emite imediatamente que o jogo está pausado
       this.io.to(gameId).emit('gamePausedForReconnect', {
         disconnectedPlayerName: gamePlayer?.getPlayerName(),
         gameStatus: 'paused_reconnect',
-        timeLeft: 600000 // Envia o tempo total em segundos
+        timeLeft: this.rec_timer // Envia o tempo total em segundos
       });
 
       // 2. Chama o serviço e AGUARDA (await) o resultado do timeout
       const gameAndPlayerId: GameAndPlayerID = { gameId, playerId };
       try {
-        const gameOverData = await this.gameService.handlePlayerDisconnect(gameAndPlayerId);
+        const gameOverData = await this.gameService.handlePlayerDisconnect(gameAndPlayerId, this.rec_timer);
+        console.log(gameOverData)
         if (gameOverData) {
           console.log('Tempo de reconexão esgotado. Encerrando o jogo.');
           this.io.to(gameId).emit('gameOver', gameOverData);

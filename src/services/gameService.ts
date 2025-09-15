@@ -24,8 +24,10 @@ export class GameService {
     }
 
     private getGame(gameId: string): Game {
-        return this.gameRepository.get(gameId);
+        const game = this.gameRepository.get(gameId);
+        return game;
     }
+
 
     public getGamePlayerById(gameId: string, playerId: string): GamePlayer | null {
         // const game = this.getGame(gameId);
@@ -33,7 +35,7 @@ export class GameService {
             const gamePlayer = this.gameRepository.getGamePlayer(gameId, playerId);
             return gamePlayer
         } catch (Error) {
-            console.log('Erro: ', Error);
+            console.log(Error);
             return null;
         }
     }
@@ -157,26 +159,36 @@ export class GameService {
         return { winner: winner, status: status, message };
     }
 
-    private disconnectCallback(gameId: string, disconnectedPlayerId: string): DisconnectResult {
-        const game = this.getGame(gameId);
-        const disconnectedPlayer = game.getGamePlayerById(disconnectedPlayerId);
+    private disconnectCallback(gameId: string, disconnectedPlayerId: string): DisconnectResult | null {
 
-        // Encontra o jogador que *não* é o que desconectou
-        const winner = game.getAllGamePlayers().find(p => p.getPlayerId() !== disconnectedPlayerId);
+        try {
+            if (!this.getGameExists(gameId)) {
+                return null;
+            }
+            const game = this.getGame(gameId);
 
-        this.setWinner(gameId, winner, 'abandoned');
-        // game.setStatus('ended'); // Atualiza o estado do jogo
+            const disconnectedPlayer = game.getGamePlayerById(disconnectedPlayerId);
 
-        return {
-            status: 'abandoned',
-            // Usa o nome do vencedor encontrado, com um fallback.
-            playerWinner: winner?.getPlayerName() || 'outro jogador',
-            message: `${disconnectedPlayer?.getPlayerName() || 'O jogador'} não se reconectou a tempo`
-        };
+            // Encontra o jogador que *não* é o que desconectou
+            const winner = game.getAllGamePlayers().find(p => p.getPlayerId() !== disconnectedPlayerId);
+
+            this.setWinner(gameId, winner, 'abandoned');
+            // game.setStatus('ended'); // Atualiza o estado do jogo
+
+            return {
+                status: 'abandoned',
+                // Usa o nome do vencedor encontrado, com um fallback.
+                playerWinner: winner?.getPlayerName() || 'outro jogador',
+                message: `${disconnectedPlayer?.getPlayerName() || 'O jogador'} não se reconectou a tempo`
+            };
+        } catch (error) {
+            console.log(error);
+            return null
+        }
     }
 
     // Delegação correta para reconexão com timer
-    public async handlePlayerDisconnect(gameAndPlayerId: GameAndPlayerID, timeoutMs: number = 6000): Promise<DisconnectResult | null> {
+    public async handlePlayerDisconnect(gameAndPlayerId: GameAndPlayerID, timeoutMs:number): Promise<DisconnectResult | null> {
         const game = this.getGame(gameAndPlayerId.gameId);
         const gameId = gameAndPlayerId.gameId;
         if (!game) {
@@ -215,15 +227,17 @@ export class GameService {
         const players = this.gameManager.getGamePlayersAtGame(game);
         const whitePlayer = players.find(p => p.color == 'white');
         const blackPlayer = players.find(p => p.color == 'black');
-        const playerWinner = this.gameManager.getWinner(game)?.getPlayerName();
+        const playerWinner = this.gameManager.getWinner(game);
         const pgn = this.notationManager.getPGN(gameId);
-        // console.log(pgn);
         if (whitePlayer !== undefined && blackPlayer !== undefined && pgn !== null && playerWinner !== undefined) {
             // const infos: IGame = { playerWhite: whitePlayer.getPlayerName(), playerBlack: blackPlayer.getPlayerName(), pgn: pgn, winner: playerWinner, roomCode: gameId };
             await this.gameRepository.saveGameToDB(
+                whitePlayer.getPlayerId(),
                 whitePlayer.getPlayerName(),
+                blackPlayer.getPlayerId(),
                 blackPlayer.getPlayerName(),
-                playerWinner,
+                playerWinner.getPlayerId(),
+                playerWinner.getPlayerName(),
                 pgn
             );
         }
@@ -254,7 +268,7 @@ export class GameService {
                 console.log('nenhuma notacao enviada')
             }
             if (moveResult.winner) {
-                this.setWinner(gameId, moveResult.winner); // só usa para setar result no notationmanager
+                this.setWinner(gameId, moveResult.winner, moveResult.status); // só usa para setar result no notationmanager
                 // const result = moveResult.winner.color === 'white' ? '1-0' : '0-1';
                 // this.notationManager.setResult(gameId, result)
             }
@@ -276,8 +290,9 @@ export class GameService {
                 game.setStatus(gameStatus);
             }
 
-            if (gameStatus === 'ended') {
+            if (gameStatus === 'ended' || gameStatus === 'checkmate' || gameStatus === 'abandoned') {
                 await this.saveGame(gameId);
+                this.gameRepository.remove(gameId);
             }
         }
     }
@@ -300,6 +315,9 @@ export class GameService {
 
 
     timerCallback(gameId: string, playerId: string) {
+        if(!this.getGameExists(gameId)){
+            return null;
+        }
         const game = this.getGame(gameId);
         const opponent = this.gameManager.getGamePlayersAtGame(game).find(p => p.getPlayerId() !== playerId);
 
@@ -308,25 +326,29 @@ export class GameService {
         }
     }
 
-    public startGameTimers(gameId: string, initialTimeMs: number = 300000): Promise<{ gameId: string, playerId: string }> {
-        const game = this.getGame(gameId);
-        const players = this.gameManager.getGamePlayersAtGame(game);
-        const playerIds = players.map((p) => {
-            return p.getPlayerId();
-        });
-        return new Promise((resolve) => {
-            this.gameManager.startGameTimers(
-                gameId,
-                playerIds,
-                initialTimeMs,
-                (gameId, playerId) => {
-                    this.timerCallback(gameId, playerId);
-                    resolve({ gameId, playerId });
-                }
-            );
+    public startGameTimers(gameId: string, initialTimeMs: number = 300000): Promise<{ gameId: string, playerId: string }> | undefined {
+        try {
+            const game = this.getGame(gameId);
+            const players = this.gameManager.getGamePlayersAtGame(game);
+            const playerIds = players.map((p) => {
+                return p.getPlayerId();
+            });
+            return new Promise((resolve) => {
+                this.gameManager.startGameTimers(
+                    gameId,
+                    playerIds,
+                    initialTimeMs,
+                    (gameId, playerId) => {
+                        this.timerCallback(gameId, playerId);
+                        resolve({ gameId, playerId });
+                    }
+                );
 
-        });
+            });
+        } catch (error) {
+            console.log(error);
 
+        }
     }
 
     getTimersByGame(gameId: string): { white: number; black: number } | undefined {
