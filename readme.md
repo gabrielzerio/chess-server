@@ -4,8 +4,11 @@
 * typescript para tipagem
 * prisma ORM + mariadb para persistencia de dados
 * containerização da aplicação e DB
+* Arquitetura DDD
 requisitos para rodar o projeto, -> docker engine
 
-docker-compose -f docker-compose.prod.yml -f docker-compose.dev.yml up
+docker compose -f docker-compose.hml.yml up --build -d
+
+hospedado em VPS Oracle
 
 PORTA 3001

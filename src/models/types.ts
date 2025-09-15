@@ -1,7 +1,13 @@
+import { GamePlayer } from '../class/GamePlayer';
+// Import da classe base Piece
+import { Piece } from '../class/piece';
+
 export type PieceType = "pawn" | "rook" | "knight" | "bishop" | "queen" | "king";
 export type PieceColor = "white" | "black";
 export type ErrorCode = 'GAME_FULL' | 'PLAYER_ALREADY_EXISTS'
-export type GameStatus = 'waiting' | 'playing' | 'ended' | 'checkmate' | 'paused_reconnect' | 'abandoned';
+export type GameStatus = 'first_movement' | 'waiting' | 'playing' | 'ended' | 'checkmate' | 'paused_reconnect' | 'abandoned';
+export type Board = (Piece | null)[][];
+export type DisconnectResult = { status: string; playerWinner: string; message: string; };
 
 export interface Position {
   row: number;
@@ -13,17 +19,9 @@ export interface EnPassantTarget {
   col: number;
 }
 
-export interface Player{
- playerName: string; 
- color?: PieceColor; 
- playerID: string | null;
- isOnline?: boolean;
- disconnectedAt?: number;
-}
-
-export interface GameAndPlayerID{
-    gameID: string;
-    playerID:string;
+export interface GameAndPlayerID {
+  gameId: string;
+  playerId: string;
 }
 
 export class GameError extends Error {
@@ -48,10 +46,29 @@ export class PlayerAlreadyExistsError extends GameError {
   }
 }
 
+export interface ApplyMoveResult {
+  success: boolean;
+  message?: string;
+  board?: any;
+  turn?: PieceColor;
+  status?: GameStatus;
+  winner?: GamePlayer;
+  isCheck?: boolean;
+  san?: string;
+}
 
+export interface IGame {
+  playerWhite: string;
+  playerBlack: string;
+  winner: string;
+  roomCode: string;
+  pgn: string;
+}
 
-import { DecorateAcknowledgementsWithMultipleResponses, DefaultEventsMap } from 'socket.io/dist/typed-events';
-// Import da classe base Piece
-import { Piece } from '../class/piece';
-import { BroadcastOperator } from 'socket.io';
-export type Board = (Piece | null)[][];
+export interface FENOptions {
+  turn?: PieceColor;           // Quem joga
+  castling?: string;           // Ex.: "KQkq", "KQ", "-"
+  enPassant?: string;          // Ex.: "e3", "-"
+  halfMove?: number;           // Contagem de meios-lances
+  fullMove?: number;           // Número do lance completo
+}

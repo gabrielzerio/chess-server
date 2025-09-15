@@ -1,21 +1,21 @@
-name: Docker build
-on:
-  push:
-    branches:
-      - main
+# name: Docker build
+# on:
+#   push:
+#     branches:
+#       - main
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
 
-      - name: Build docker image
-        run: docker build . --file Dockerfile --tag gabrielzerio/chess-api:latest
+#       - name: Build docker image
+#         run: docker build . --file Dockerfile --tag gabrielzerio/chess-api:latest
 
-      - name: Login to DockerHub
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+#       - name: Login to DockerHub
+        # run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      - name: Publish image to dockerhub
-        run: docker push gabrielzerio/chess-api:latest
+#       - name: Publish image to dockerhub
+#         run: docker push gabrielzerio/chess-api:latest

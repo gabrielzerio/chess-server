@@ -1,9 +1,13 @@
 name: "Deploy VPS OCI"
 on:
-  workflow_run:
-    workflows: ["Docker build"]
-    types:
-      - completed
+  # workflow_run:
+  #   workflows: ["Docker build"]
+  #   types:
+  #     - completed
+  push:
+    branches:
+      - main
+
 jobs:
   build_deploy:
     runs-on: ubuntu-latest
