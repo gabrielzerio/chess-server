@@ -1,45 +1,10 @@
 // src/repositories/GameRepository.ts
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { Game } from "../class/game";
 import { GamePlayer } from "../class/GamePlayer";
-import { PrismaClient, Game as PrismaGame } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
-
-// Decorator para rodar uma função após o método
-function afterMethod(afterFn: () => Promise<void>) {
-  return function (
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor
-  ) {
-    const originalMethod = descriptor.value;
-    descriptor.value = async function (...args: any[]) {
-      try {
-        return await originalMethod.apply(this, args);
-      } finally {
-        await afterFn();
-      }
-    };
-    return descriptor;
-  };
-}
-
-// Função para aplicar o decorator em todos os métodos da classe
-function decorateAllMethods(targetClass: any, decorator: any) {
-  const propertyNames = Object.getOwnPropertyNames(targetClass.prototype);
-  for (const name of propertyNames) {
-    if (
-      name !== "constructor" &&
-      typeof targetClass.prototype[name] === "function"
-    ) {
-      const descriptor = Object.getOwnPropertyDescriptor(targetClass.prototype, name);
-      if (descriptor) {
-        decorator(targetClass.prototype, name, descriptor);
-        Object.defineProperty(targetClass.prototype, name, descriptor);
-      }
-    }
-  }
-}
 
 export class GameRepository {
   private games: { [key: string]: Game } = {};
@@ -146,25 +111,33 @@ export class GameRepository {
     winnerName: string,
     pgn: string
   ) {
-    // cria ou pega jogadores existentes
-    const whitePlayer = await this.findOrCreatePlayer(whitePlayerId, { name: whitePlayerName });
-    const blackPlayer = await this.findOrCreatePlayer(blackPlayerId, { name: blackPlayerName });
-    const winnerPlayer = await this.findOrCreatePlayer(winnerId, { name: winnerName });
-    // salva o jogo
-    const game = await prisma.game.create({
-      data: {
-        playerWhiteId: whitePlayer.id,
-        playerBlackId: blackPlayer.id,
-        winnerId: winnerPlayer.id,
-        pgn,
-        endedAt: new Date(),
-      },
-    });
+    try {
+      const whitePlayer = await this.findOrCreatePlayer(whitePlayerId, { name: whitePlayerName });
+      const blackPlayer = await this.findOrCreatePlayer(blackPlayerId, { name: blackPlayerName });
+      const winnerPlayer = await this.findOrCreatePlayer(winnerId, { name: winnerName });
 
-    console.log("Jogo salvo no banco:", game);
-    return game;
+      const game = await prisma.game.create({
+        data: {
+          playerWhiteId: whitePlayer.id,
+          playerBlackId: blackPlayer.id,
+          winnerId: winnerPlayer.id,
+          pgn,
+          endedAt: new Date(),
+        },
+      });
+
+      console.log("✅ Jogo salvo no banco:", game);
+      return game;
+    } catch (error) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        console.error(`⚠️ Erro Prisma ao salvar jogo (code ${error.code}):`, error.meta);
+      } else {
+        console.error("❌ Erro inesperado ao salvar jogo:", error);
+      }
+      // não relança, apenas loga — aplicação continua rodando
+      return null;
+    }
   }
-
 }
 // decorateAllMethods(GameRepository, afterMethod(async () => prisma.$disconnect()));
 

@@ -39,7 +39,7 @@ export abstract class Piece {
 
     return char;
   }
-  
+
   isValidMove(from: Position, to: Position, board: Board, context: MoveContext = {}): boolean {
     return this.isValidPattern(from, to, board, context) && this.isMoveSafe(from, to, board);
   }
@@ -60,15 +60,16 @@ export abstract class Piece {
   protected isMoveSafe(from: Position, to: Position, board: Board): boolean {
     const targetPiece = board[to.row][to.col];
     if (targetPiece && targetPiece.color === this.color) {
-
       return false;
     }
 
-    const king = this.findKing(this.color, board);
-    if (!king) return true;
-
-    return this.simulateMove(from, to, board, () => !king.isInCheck(board));
+    return this.simulateMove(from, to, board, () => {
+      const king = this.findKing(this.color, board);
+      if (!king) return true;
+      return !king.isInCheck(board);
+    });
   }
+
 
   /**
    * Verifica se o caminho entre duas posições está bloqueado.

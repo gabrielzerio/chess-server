@@ -21,10 +21,10 @@ model Player {
 
 model Game {
   id            Int      @id @default(autoincrement())
-  pgn      String
+  pgn           String   @db.Text
 
   playerWhite   Player   @relation("WhitePlayer", fields: [playerWhiteId], references: [id])
-  playerWhiteId Int
+  playerWhiteId Int 
 
   playerBlack   Player?  @relation("BlackPlayer", fields: [playerBlackId], references: [id])
   playerBlackId Int?

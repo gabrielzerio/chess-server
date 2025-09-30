@@ -6,7 +6,7 @@ services:
       DATABASE_URL: "mysql://chessuser:chesspass@mariadb:3306/chessdb"
       # REDIS_URL: "redis://:Redis2019!@redis:6379"
       NODE_ENV: ${NODE_ENV}
-      
+      RECONNECTION_TIMER: ${NODE_ENV}
     depends_on:
       mariadb:
         condition: service_healthy
