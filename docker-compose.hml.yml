@@ -5,10 +5,11 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      NODE_ENV: "hml"
-      NOME_CONTAINER: "chess-api-local"
-      DATABASE_URL: "mysql://chessuser:chesspass@mariadb:3306/chessdb"
+      NODE_ENV: ${NODE_ENV}
+      NOME_CONTAINER: ${NOME_CONTAINER}
+      DATABASE_URL: ${DATABASE_URL}
       # REDIS_URL: "redis://:Redis2019!@redis:6379"
+      RECONNECTION_TIMER: ${RECONNECTION_TIMER}
     depends_on:
       mariadb:
         condition: service_healthy
@@ -27,15 +28,15 @@ services:
       MARIADB_DATABASE: chessdb
       MARIADB_USER: chessuser
       MARIADB_PASSWORD: chesspass
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb_data:/var/lib/mariadb
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
       interval: 10s
       timeout: 5s
       retries: 3
-    ports:
-      - "3307:3306"
-    volumes:
-      - mariadb_data:/var/lib/mariadb
 
   # redis:
   #   image: redis

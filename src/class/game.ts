@@ -113,7 +113,6 @@ export class Game {
 
         // Deserializa a peça para ter os métodos corretos, se necessário
         const currentPiece = PieceFactory.createPiece(piece.type, piece.color, piece.position);
-
         if (typeof currentPiece.showPossibleMoves === 'function') {
             possibleMoves = currentPiece.showPossibleMoves(this.board, context);
         }
